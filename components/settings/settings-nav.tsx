@@ -1,19 +1,24 @@
 "use client";
 
 import { SettingsTabIcon } from "@/components/settings/settings-tab-icon";
-import { SETTINGS_TABS, type SettingsTab } from "@/lib/settings";
+import { SETTINGS_TABS, type SettingsTab, type SettingsTabItem } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 
 type SettingsNavProps = {
   active: SettingsTab;
   onChange: (tab: SettingsTab) => void;
+  tabs?: SettingsTabItem[];
 };
 
-export function SettingsNav({ active, onChange }: SettingsNavProps) {
+export function SettingsNav({
+  active,
+  onChange,
+  tabs = SETTINGS_TABS,
+}: SettingsNavProps) {
   return (
     <nav aria-label="Settings sections" className="h-full">
       <ul className="flex gap-1.5 overflow-x-auto p-3 sm:flex-col sm:gap-1.5 sm:overflow-visible sm:p-4">
-        {SETTINGS_TABS.map((tab) => {
+        {tabs.map((tab) => {
           const isActive = tab.id === active;
           return (
             <li key={tab.id} className="shrink-0 sm:w-full">

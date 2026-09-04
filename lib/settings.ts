@@ -1,22 +1,32 @@
 export type SettingsTab = "profile" | "security" | "notifications" | "billings";
 
-export const SETTINGS_TABS: { id: SettingsTab; label: string }[] = [
+export type SettingsTabItem = { id: SettingsTab; label: string };
+
+export const SETTINGS_TABS: SettingsTabItem[] = [
   { id: "profile", label: "Profile" },
   { id: "security", label: "Security" },
   { id: "notifications", label: "Notifications" },
   { id: "billings", label: "Billing" },
 ];
 
+export const ADMIN_SETTINGS_TABS: SettingsTabItem[] = [
+  { id: "profile", label: "Profile" },
+  { id: "security", label: "Security" },
+  { id: "notifications", label: "Notifications" },
+];
+
 export function isSettingsTab(
   value: string | null | undefined,
+  tabs: SettingsTabItem[] = SETTINGS_TABS,
 ): value is SettingsTab {
-  return SETTINGS_TABS.some((tab) => tab.id === value);
+  return tabs.some((tab) => tab.id === value);
 }
 
 export function parseSettingsTab(
   value: string | null | undefined,
+  tabs: SettingsTabItem[] = SETTINGS_TABS,
 ): SettingsTab {
-  return isSettingsTab(value) ? value : "profile";
+  return isSettingsTab(value, tabs) ? value : "profile";
 }
 
 export type ProfileSettings = {

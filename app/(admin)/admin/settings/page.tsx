@@ -1,15 +1,13 @@
 "use client";
 
-import { PagePlaceholder } from "@/components/page/page-placeholder";
+import { SettingsPage } from "@/components/settings/settings-page";
 import { Action, Resource, RequirePermission } from "@/lib/permissions";
+import { ADMIN_SETTINGS_TABS } from "@/lib/settings";
 
 export default function AdminSettingsPage() {
   return (
     <RequirePermission action={Action.READ} resource={Resource.SETTINGS}>
-      <PagePlaceholder
-        title="Settings"
-        description="Admin settings will live here."
-      />
+      <SettingsPage basePath="/admin/settings" tabs={ADMIN_SETTINGS_TABS} />
     </RequirePermission>
   );
 }
