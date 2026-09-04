@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
+import { SignOutButton } from "@/components/auth/sign-out-button";
 import { Avatar } from "@/components/ui/avatar";
 import { usePermission } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
@@ -121,15 +122,12 @@ export function UserMenu({
           </div>
 
           <div className="border-t border-[#f0f0f0] py-1">
-            <Link
-              href="/auth/signin"
-              role="menuitem"
-              className="flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-[#d64545] transition-colors hover:bg-[#fff1f1]"
-              onClick={() => setOpen(false)}
+            <SignOutButton
+              className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm text-[#d64545] transition-colors hover:bg-[#fff1f1]"
             >
               <LogoutIcon />
               Sign out
-            </Link>
+            </SignOutButton>
           </div>
         </div>
       ) : null}

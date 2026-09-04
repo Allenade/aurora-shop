@@ -2,9 +2,14 @@
 
 import type { ReactNode } from "react";
 import { PermissionProvider } from "@/lib/permissions";
-import { getAdminSessionUser } from "@/lib/session";
+import type { SessionUser } from "@/lib/permissions/permissions.types";
 
-export function AdminProviders({ children }: { children: ReactNode }) {
-  const user = getAdminSessionUser();
+export function AdminProviders({
+  children,
+  user,
+}: {
+  children: ReactNode;
+  user: SessionUser;
+}) {
   return <PermissionProvider user={user}>{children}</PermissionProvider>;
 }

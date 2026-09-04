@@ -11,6 +11,7 @@ import {
 } from "react";
 import { AuroraLogo } from "@/components/auth/aurora-logo";
 import { AuthButton } from "@/components/auth/form-controls";
+import { loginRequest } from "@/lib/bff/client";
 
 const OTP_LENGTH = 6;
 
@@ -73,14 +74,25 @@ function VerifyForm() {
     inputsRef.current[Math.min(pasted.length, OTP_LENGTH - 1)]?.focus();
   };
 
-  const onVerify = (e: React.FormEvent) => {
+  const onVerify = async (e: React.FormEvent) => {
     e.preventDefault();
     if (digits.join("").length !== OTP_LENGTH) {
       setError("Enter the 6-digit verification code");
       return;
     }
     setError("");
-    router.push(`/auth/success?email=${encodeURIComponent(email)}`);
+    try {
+      // Mock BFF: establish httpOnly session after OTP (any 4+ char password works).
+      await loginRequest({
+        email,
+        password: "mock-verified",
+        rememberMe: true,
+      });
+      router.push(`/auth/success?email=${encodeURIComponent(email)}`);
+      router.refresh();
+    } catch {
+      setError("Could not complete verification. Try again.");
+    }
   };
 
   return (
