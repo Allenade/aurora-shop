@@ -102,10 +102,6 @@ export function EditProductModal({ mode, product, onClose, onSave }: EditProduct
   );
 
   useEffect(() => {
-    setForm(product ? toFormState(product) : EMPTY_FORM);
-  }, [product, mode]);
-
-  useEffect(() => {
     const previous = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 

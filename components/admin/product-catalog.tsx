@@ -343,6 +343,7 @@ export function ProductCatalog() {
 
       {editingProduct ? (
         <EditProductModal
+          key={editingProduct.id}
           mode="edit"
           product={editingProduct}
           onClose={() => setEditingId(null)}
@@ -351,7 +352,12 @@ export function ProductCatalog() {
       ) : null}
 
       {isAdding ? (
-        <EditProductModal mode="add" onClose={() => setIsAdding(false)} onSave={handleSave} />
+        <EditProductModal
+          key="add-product"
+          mode="add"
+          onClose={() => setIsAdding(false)}
+          onSave={handleSave}
+        />
       ) : null}
 
       {removingProduct ? (
