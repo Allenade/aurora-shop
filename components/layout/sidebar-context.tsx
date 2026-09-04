@@ -4,8 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
-  useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 
@@ -23,44 +22,58 @@ type SidebarProviderProps = {
   storageKey?: string;
 };
 
+function sidebarEventName(storageKey: string) {
+  return `aurora-sidebar:${storageKey}`;
+}
+
+function subscribeCollapsed(storageKey: string, onStoreChange: () => void) {
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === storageKey || event.key === null) onStoreChange();
+  };
+  const onLocal = () => onStoreChange();
+
+  window.addEventListener("storage", onStorage);
+  window.addEventListener(sidebarEventName(storageKey), onLocal);
+  return () => {
+    window.removeEventListener("storage", onStorage);
+    window.removeEventListener(sidebarEventName(storageKey), onLocal);
+  };
+}
+
+function getCollapsedSnapshot(storageKey: string) {
+  return window.localStorage.getItem(storageKey) === "1";
+}
+
+function writeCollapsed(storageKey: string, value: boolean) {
+  window.localStorage.setItem(storageKey, value ? "1" : "0");
+  window.dispatchEvent(new Event(sidebarEventName(storageKey)));
+}
+
 export function SidebarProvider({
   children,
   storageKey = "aurora-sidebar-collapsed",
 }: SidebarProviderProps) {
-  const [collapsed, setCollapsedState] = useState(false);
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    const stored = window.localStorage.getItem(storageKey);
-    if (stored === "1") setCollapsedState(true);
-    setReady(true);
-  }, [storageKey]);
+  const collapsed = useSyncExternalStore(
+    (onStoreChange) => subscribeCollapsed(storageKey, onStoreChange),
+    () => getCollapsedSnapshot(storageKey),
+    () => false,
+  );
 
   const setCollapsed = useCallback(
     (value: boolean) => {
-      setCollapsedState(value);
-      window.localStorage.setItem(storageKey, value ? "1" : "0");
+      writeCollapsed(storageKey, value);
     },
     [storageKey],
   );
 
   const toggle = useCallback(() => {
-    setCollapsedState((prev) => {
-      const next = !prev;
-      window.localStorage.setItem(storageKey, next ? "1" : "0");
-      return next;
-    });
+    writeCollapsed(storageKey, !getCollapsedSnapshot(storageKey));
   }, [storageKey]);
 
-  // Avoid hydration mismatch flash — render expanded until client reads storage
-  const value = {
-    collapsed: ready ? collapsed : false,
-    toggle,
-    setCollapsed,
-  };
-
   return (
-    <SidebarContext.Provider value={value}>{children}</SidebarContext.Provider>
+    <SidebarContext.Provider value={{ collapsed, toggle, setCollapsed }}>
+      {children}
+    </SidebarContext.Provider>
   );
 }
 

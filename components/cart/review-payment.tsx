@@ -1,5 +1,4 @@
 import Image from "next/image";
-import type { ReactNode } from "react";
 import {
   formatCartMoney,
   type DeliveryFormState,

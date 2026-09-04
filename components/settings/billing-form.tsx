@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { CopyTrackingButton } from "@/components/cart/copy-tracking-button";
 import {
   BILLING_HISTORY,
@@ -11,6 +11,23 @@ import {
   getSavedReceipts,
   type OrderReceipt,
 } from "@/lib/receipts";
+
+function subscribeReceipts(onStoreChange: () => void) {
+  window.addEventListener("aurora-receipts-changed", onStoreChange);
+  window.addEventListener("storage", onStoreChange);
+  return () => {
+    window.removeEventListener("aurora-receipts-changed", onStoreChange);
+    window.removeEventListener("storage", onStoreChange);
+  };
+}
+
+function useSavedReceipts(): OrderReceipt[] {
+  return useSyncExternalStore(
+    subscribeReceipts,
+    getSavedReceipts,
+    () => [],
+  );
+}
 
 function CardIcon() {
   return (
@@ -43,11 +60,7 @@ export function BillingForm() {
   const [methods, setMethods] = useState<PaymentMethod[]>(
     DEFAULT_PAYMENT_METHODS,
   );
-  const [receipts, setReceipts] = useState<OrderReceipt[]>([]);
-
-  useEffect(() => {
-    setReceipts(getSavedReceipts());
-  }, []);
+  const receipts = useSavedReceipts();
 
   function handleRemove(id: string) {
     setMethods((prev) => prev.filter((method) => method.id !== id));
