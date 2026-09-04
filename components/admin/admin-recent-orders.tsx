@@ -1,4 +1,5 @@
-import Link from "next/link";
+"use client";
+
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { ViewAllLink } from "@/components/ui/view-all-link";
@@ -10,7 +11,15 @@ function statusTone(status: AdminRecentOrder["status"]) {
   return "orange" as const;
 }
 
-export function AdminRecentOrders({ orders }: { orders: AdminRecentOrder[] }) {
+type AdminRecentOrdersProps = {
+  orders: AdminRecentOrder[];
+  onOpenOrder: (order: AdminRecentOrder) => void;
+};
+
+export function AdminRecentOrders({
+  orders,
+  onOpenOrder,
+}: AdminRecentOrdersProps) {
   return (
     <Card className="flex h-full flex-col overflow-hidden">
       <div className="border-b border-[#f0f0f0] px-5 py-4">
@@ -38,12 +47,13 @@ export function AdminRecentOrders({ orders }: { orders: AdminRecentOrder[] }) {
                 className="border-b border-[#f5f5f5] last:border-0"
               >
                 <td className="px-5 py-3.5">
-                  <Link
-                    href="/admin/orders"
+                  <button
+                    type="button"
+                    onClick={() => onOpenOrder(order)}
                     className="font-medium whitespace-nowrap text-[#2f6fed] hover:underline"
                   >
                     {order.id}
-                  </Link>
+                  </button>
                 </td>
                 <td className="px-3 py-3.5 text-[#5f5f5f]">{order.customer}</td>
                 <td className="px-3 py-3.5 font-medium whitespace-nowrap text-aurora-ink">
