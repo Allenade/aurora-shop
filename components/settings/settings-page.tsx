@@ -7,12 +7,26 @@ import { NotificationsForm } from "@/components/settings/notifications-form";
 import { ProfileForm } from "@/components/settings/profile-form";
 import { SecurityForm } from "@/components/settings/security-form";
 import { SettingsNav } from "@/components/settings/settings-nav";
-import { parseSettingsTab, type SettingsTab } from "@/lib/settings";
+import {
+  parseSettingsTab,
+  SETTINGS_TABS,
+  type SettingsTab,
+  type SettingsTabItem,
+} from "@/lib/settings";
 
-function SettingsContent() {
+type SettingsPageProps = {
+  basePath?: string;
+  tabs?: SettingsTabItem[];
+};
+
+function SettingsContent({
+  basePath = "/settings",
+  tabs = SETTINGS_TABS,
+}: SettingsPageProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const tab = parseSettingsTab(searchParams.get("tab"));
+  const tab = parseSettingsTab(searchParams.get("tab"), tabs);
+  const showBilling = tabs.some((item) => item.id === "billings");
 
   function setTab(next: SettingsTab) {
     const params = new URLSearchParams(searchParams.toString());
@@ -22,7 +36,7 @@ function SettingsContent() {
       params.set("tab", next);
     }
     const query = params.toString();
-    router.replace(query ? `/settings?${query}` : "/settings", {
+    router.replace(query ? `${basePath}?${query}` : basePath, {
       scroll: false,
     });
   }
@@ -40,21 +54,24 @@ function SettingsContent() {
 
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
         <div className="w-full shrink-0 rounded-2xl border border-[#e5e5e5] bg-white lg:w-[220px]">
-          <SettingsNav active={tab} onChange={setTab} />
+          <SettingsNav active={tab} onChange={setTab} tabs={tabs} />
         </div>
 
         <div className="min-w-0 flex-1 rounded-2xl border border-[#e5e5e5] bg-white">
           {tab === "profile" ? <ProfileForm /> : null}
           {tab === "security" ? <SecurityForm /> : null}
           {tab === "notifications" ? <NotificationsForm /> : null}
-          {tab === "billings" ? <BillingForm /> : null}
+          {showBilling && tab === "billings" ? <BillingForm /> : null}
         </div>
       </div>
     </div>
   );
 }
 
-export function SettingsPage() {
+export function SettingsPage({
+  basePath = "/settings",
+  tabs = SETTINGS_TABS,
+}: SettingsPageProps = {}) {
   return (
     <Suspense
       fallback={
@@ -63,7 +80,7 @@ export function SettingsPage() {
         </div>
       }
     >
-      <SettingsContent />
+      <SettingsContent basePath={basePath} tabs={tabs} />
     </Suspense>
   );
 }

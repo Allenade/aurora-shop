@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { useEffect, useState, type FormEvent } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useState, type FormEvent } from 'react';
+import { createPortal } from 'react-dom';
 import {
   CATALOG_CATEGORIES,
   CATALOG_STATUS_OPTIONS,
@@ -9,21 +9,21 @@ import {
   parseCatalogPrice,
   type CatalogProduct,
   type CatalogStatus,
-} from "@/lib/admin";
-import { cn } from "@/lib/utils";
+} from '@/lib/admin';
+import { cn } from '@/lib/utils';
 
 const fieldClassName =
-  "h-11 w-full rounded-lg border border-[#e5e5e5] bg-white px-3 text-sm text-aurora-ink outline-none placeholder:text-[#9a9a9a] focus:border-aurora-ink/30";
+  'h-11 w-full rounded-lg border border-[#e5e5e5] bg-white px-3 text-sm text-aurora-ink outline-none placeholder:text-[#9a9a9a] focus:border-aurora-ink/30';
 
 const EMPTY_FORM = {
-  name: "",
-  sku: "",
+  name: '',
+  sku: '',
   category: CATALOG_CATEGORIES[0],
-  price: "",
-  stock: "",
-  minStock: "20",
-  status: "IN STOCK" as CatalogStatus,
-  specs: "",
+  price: '',
+  stock: '',
+  minStock: '20',
+  status: 'IN STOCK' as CatalogStatus,
+  specs: '',
 };
 
 function FieldLabel({
@@ -88,50 +88,38 @@ function toFormState(product: CatalogProduct): EditFormState {
 }
 
 type EditProductModalProps = {
-  mode: "edit" | "add";
+  mode: 'edit' | 'add';
   product?: CatalogProduct;
   onClose: () => void;
   onSave: (product: CatalogProduct) => void;
 };
 
-export function EditProductModal({
-  mode,
-  product,
-  onClose,
-  onSave,
-}: EditProductModalProps) {
-  const isAdd = mode === "add";
+export function EditProductModal({ mode, product, onClose, onSave }: EditProductModalProps) {
+  const isAdd = mode === 'add';
   const [entered, setEntered] = useState(false);
   const [form, setForm] = useState<EditFormState>(() =>
     product ? toFormState(product) : EMPTY_FORM,
   );
 
   useEffect(() => {
-    setForm(product ? toFormState(product) : EMPTY_FORM);
-  }, [product, mode]);
-
-  useEffect(() => {
     const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    document.body.style.overflow = 'hidden';
 
     const frame = requestAnimationFrame(() => setEntered(true));
 
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
+      if (event.key === 'Escape') onClose();
     }
 
-    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener('keydown', onKeyDown);
     return () => {
       cancelAnimationFrame(frame);
       document.body.style.overflow = previous;
-      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener('keydown', onKeyDown);
     };
   }, [onClose]);
 
-  function updateField<K extends keyof EditFormState>(
-    key: K,
-    value: EditFormState[K],
-  ) {
+  function updateField<K extends keyof EditFormState>(key: K, value: EditFormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
@@ -155,18 +143,18 @@ export function EditProductModal({
       status: form.status,
       description: specs || name,
       specs,
-      image: product?.image ?? "/images/auth-panel.png",
+      image: product?.image ?? '/images/auth-panel.png',
     });
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 sm:p-6">
+    <div className="fixed inset-0 z-80 flex items-center justify-center p-4 sm:p-6">
       <button
         type="button"
-        aria-label={isAdd ? "Close add product" : "Close edit product"}
+        aria-label={isAdd ? 'Close add product' : 'Close edit product'}
         className={cn(
-          "absolute inset-0 bg-[#111111]/35 transition-opacity duration-300",
-          entered ? "opacity-100" : "opacity-0",
+          'absolute inset-0 bg-[#111111]/35 transition-opacity duration-300',
+          entered ? 'opacity-100' : 'opacity-0',
         )}
         onClick={onClose}
       />
@@ -176,8 +164,8 @@ export function EditProductModal({
         aria-modal="true"
         aria-labelledby="product-modal-title"
         className={cn(
-          "relative z-10 flex max-h-[min(92dvh,820px)] w-full max-w-xl flex-col overflow-hidden rounded-2xl bg-white shadow-[0_20px_60px_rgba(0,0,0,0.2)] transition-all duration-300",
-          entered ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0",
+          'relative z-10 flex max-h-[min(92dvh,820px)] w-full max-w-xl flex-col overflow-hidden rounded-2xl bg-white shadow-[0_20px_60px_rgba(0,0,0,0.2)] transition-all duration-300',
+          entered ? 'translate-y-0 opacity-100' : 'translate-y-3 opacity-0',
         )}
       >
         <div className="flex items-center justify-between border-b border-[#ececec] px-5 py-4 sm:px-6">
@@ -185,7 +173,7 @@ export function EditProductModal({
             id="product-modal-title"
             className="text-lg font-bold tracking-tight text-aurora-ink sm:text-xl"
           >
-            {isAdd ? "Add Product" : "Edit Product"}
+            {isAdd ? 'Add Product' : 'Edit Product'}
           </h2>
           <button
             type="button"
@@ -213,7 +201,7 @@ export function EditProductModal({
               <input
                 id="product-name"
                 value={form.name}
-                onChange={(e) => updateField("name", e.target.value)}
+                onChange={(e) => updateField('name', e.target.value)}
                 className={fieldClassName}
                 required
               />
@@ -227,7 +215,7 @@ export function EditProductModal({
                 <input
                   id="product-sku"
                   value={form.sku}
-                  onChange={(e) => updateField("sku", e.target.value)}
+                  onChange={(e) => updateField('sku', e.target.value)}
                   className={fieldClassName}
                   required
                 />
@@ -237,7 +225,7 @@ export function EditProductModal({
                 <select
                   id="product-category"
                   value={form.category}
-                  onChange={(e) => updateField("category", e.target.value)}
+                  onChange={(e) => updateField('category', e.target.value)}
                   className={fieldClassName}
                 >
                   {!CATALOG_CATEGORIES.includes(
@@ -263,9 +251,7 @@ export function EditProductModal({
                   id="product-price"
                   inputMode="numeric"
                   value={form.price}
-                  onChange={(e) =>
-                    updateField("price", e.target.value.replace(/[^\d]/g, ""))
-                  }
+                  onChange={(e) => updateField('price', e.target.value.replace(/[^\d]/g, ''))}
                   className={fieldClassName}
                   required
                 />
@@ -276,9 +262,7 @@ export function EditProductModal({
                   id="product-stock"
                   inputMode="numeric"
                   value={form.stock}
-                  onChange={(e) =>
-                    updateField("stock", e.target.value.replace(/[^\d]/g, ""))
-                  }
+                  onChange={(e) => updateField('stock', e.target.value.replace(/[^\d]/g, ''))}
                   className={fieldClassName}
                 />
               </div>
@@ -286,19 +270,12 @@ export function EditProductModal({
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <FieldLabel htmlFor="product-min-stock">
-                  Low stock threshold
-                </FieldLabel>
+                <FieldLabel htmlFor="product-min-stock">Low stock threshold</FieldLabel>
                 <input
                   id="product-min-stock"
                   inputMode="numeric"
                   value={form.minStock}
-                  onChange={(e) =>
-                    updateField(
-                      "minStock",
-                      e.target.value.replace(/[^\d]/g, ""),
-                    )
-                  }
+                  onChange={(e) => updateField('minStock', e.target.value.replace(/[^\d]/g, ''))}
                   className={fieldClassName}
                 />
               </div>
@@ -307,9 +284,7 @@ export function EditProductModal({
                 <select
                   id="product-status"
                   value={form.status}
-                  onChange={(e) =>
-                    updateField("status", e.target.value as CatalogStatus)
-                  }
+                  onChange={(e) => updateField('status', e.target.value as CatalogStatus)}
                   className={fieldClassName}
                 >
                   {CATALOG_STATUS_OPTIONS.map((option) => (
@@ -322,13 +297,11 @@ export function EditProductModal({
             </div>
 
             <div>
-              <FieldLabel htmlFor="product-specs">
-                Technical Specifications
-              </FieldLabel>
+              <FieldLabel htmlFor="product-specs">Technical Specifications</FieldLabel>
               <textarea
                 id="product-specs"
                 value={form.specs}
-                onChange={(e) => updateField("specs", e.target.value)}
+                onChange={(e) => updateField('specs', e.target.value)}
                 rows={4}
                 placeholder="Enter product specifications, features and technical details..."
                 className="w-full resize-y rounded-lg border border-[#e5e5e5] bg-white px-3 py-2.5 text-sm text-aurora-ink outline-none placeholder:text-[#9a9a9a] focus:border-aurora-ink/30"
@@ -370,7 +343,7 @@ export function EditProductModal({
               type="submit"
               className="inline-flex h-11 flex-1 items-center justify-center rounded-lg bg-aurora-lime px-4 text-sm font-semibold text-aurora-ink transition-opacity hover:opacity-90"
             >
-              {isAdd ? "Add Product" : "Save Changes"}
+              {isAdd ? 'Add Product' : 'Save Changes'}
             </button>
           </div>
         </form>

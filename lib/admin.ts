@@ -358,6 +358,140 @@ export const CATALOG_PRODUCTS: CatalogProduct[] = [
 
 export const CATALOG_TOTAL_COUNT = 103;
 
+export type InventoryItem = {
+  id: string;
+  name: string;
+  description: string;
+  sku: string;
+  category: string;
+  image: string;
+  stock: number;
+  capacity: number;
+  lastRestocked: string;
+  status: CatalogStatus;
+};
+
+export function resolveInventoryStatus(
+  stock: number,
+  capacity: number,
+): CatalogStatus {
+  if (stock <= 0) return "OUT OF STOCK";
+  if (capacity <= 0) return "OUT OF STOCK";
+  const percent = (stock / capacity) * 100;
+  if (percent <= 5) return "CRITICAL";
+  if (percent <= 15) return "LOW STOCK";
+  return "IN STOCK";
+}
+
+export function formatInventoryRestockDate(date = new Date()) {
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+export const INVENTORY_ITEMS: InventoryItem[] = [
+  {
+    id: "inv1",
+    name: "Arduino Uno R3",
+    description: "ATmega328P, 5V, 16MHz, 14 Digital Pins",
+    sku: "A00-UNO-R3",
+    category: "Microcontrollers",
+    image: "/images/auth-panel.png",
+    stock: 3,
+    capacity: 200,
+    lastRestocked: "Apr 16, 2026",
+    status: "CRITICAL",
+  },
+  {
+    id: "inv2",
+    name: "ESP32 DevKit V1",
+    description: "Wi-Fi + Bluetooth dual-core MCU",
+    sku: "ESP-32-DK",
+    category: "Microcontrollers",
+    image: "/images/auth-signin-panel.png",
+    stock: 0,
+    capacity: 200,
+    lastRestocked: "Apr 12, 2026",
+    status: "OUT OF STOCK",
+  },
+  {
+    id: "inv3",
+    name: "Raspberry Pi 4 Model B",
+    description: "4GB RAM, dual HDMI, Gigabit Ethernet",
+    sku: "AS-RPI-4B",
+    category: "Microcontrollers",
+    image: "/images/auth-panel.png",
+    stock: 186,
+    capacity: 200,
+    lastRestocked: "Apr 14, 2026",
+    status: "IN STOCK",
+  },
+  {
+    id: "inv4",
+    name: "DHT22 Sensor",
+    description: "Digital humidity & temperature sensor",
+    sku: "AS-DHT-22",
+    category: "Sensors",
+    image: "/images/auth-signin-panel.png",
+    stock: 16,
+    capacity: 200,
+    lastRestocked: "Apr 10, 2026",
+    status: "LOW STOCK",
+  },
+  {
+    id: "inv5",
+    name: "L298N Motor Module",
+    description: "Dual H-bridge motor driver",
+    sku: "L298N-DRV",
+    category: "Motors",
+    image: "/images/auth-panel.png",
+    stock: 42,
+    capacity: 150,
+    lastRestocked: "Apr 09, 2026",
+    status: "IN STOCK",
+  },
+  {
+    id: "inv6",
+    name: "12V 5A Power Supply",
+    description: "Switching PSU for embedded projects",
+    sku: "AS-PSU-12",
+    category: "Powers",
+    image: "/images/auth-signin-panel.png",
+    stock: 8,
+    capacity: 100,
+    lastRestocked: "Apr 08, 2026",
+    status: "LOW STOCK",
+  },
+  {
+    id: "inv7",
+    name: "NEMA 17 Stepper",
+    description: "1.8° stepper motor, 1.5A",
+    sku: "AS-MOT-17",
+    category: "Motors",
+    image: "/images/auth-panel.png",
+    stock: 0,
+    capacity: 120,
+    lastRestocked: "Apr 05, 2026",
+    status: "OUT OF STOCK",
+  },
+  {
+    id: "inv8",
+    name: "OLED 128×64 Display",
+    description: "I2C SSD1306 module",
+    sku: "AS-OLED-96",
+    category: "Sensors",
+    image: "/images/auth-signin-panel.png",
+    stock: 2,
+    capacity: 180,
+    lastRestocked: "Apr 03, 2026",
+    status: "CRITICAL",
+  },
+];
+
+export const INVENTORY_TOTAL_COUNT = 12;
+
 export type AdminOrderStatus = "Delivered" | "In Transit" | "Pending";
 
 export type AdminOrderPayment = "Bank Transfer" | "Card";
