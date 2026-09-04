@@ -1,15 +1,15 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
-import { Avatar } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import type { AdminUser, AdminUserStatus } from "@/lib/admin";
-import { cn } from "@/lib/utils";
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Avatar } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import type { AdminUser, AdminUserStatus } from '@/lib/admin';
+import { cn } from '@/lib/utils';
 
 function statusTone(status: AdminUserStatus) {
-  return status === "ACTIVE" ? ("green" as const) : ("red" as const);
+  return status === 'ACTIVE' ? ('green' as const) : ('red' as const);
 }
 
 function StatCard({ label, value }: { label: string; value: string }) {
@@ -33,34 +33,34 @@ export function AdminUserDetailDrawer({
   onStatusChange,
 }: AdminUserDetailDrawerProps) {
   const [entered, setEntered] = useState(false);
-  const isActive = user.status === "ACTIVE";
+  const isActive = user.status === 'ACTIVE';
 
   useEffect(() => {
     const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    document.body.style.overflow = 'hidden';
 
     const frame = requestAnimationFrame(() => setEntered(true));
 
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
+      if (event.key === 'Escape') onClose();
     }
 
-    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener('keydown', onKeyDown);
     return () => {
       cancelAnimationFrame(frame);
       document.body.style.overflow = previous;
-      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener('keydown', onKeyDown);
     };
   }, [onClose]);
 
   return createPortal(
-    <div className="fixed inset-0 z-[80]">
+    <div className="fixed inset-0 z-80">
       <button
         type="button"
         aria-label="Close user details"
         className={cn(
-          "absolute inset-0 bg-[#111111]/25 transition-opacity duration-300",
-          entered ? "opacity-100" : "opacity-0",
+          'absolute inset-0 bg-[#111111]/25 transition-opacity duration-300',
+          entered ? 'opacity-100' : 'opacity-0',
         )}
         onClick={onClose}
       />
@@ -70,8 +70,8 @@ export function AdminUserDetailDrawer({
         aria-modal="true"
         aria-labelledby="admin-user-detail-title"
         className={cn(
-          "absolute inset-y-0 right-0 flex w-full max-w-[400px] flex-col bg-white shadow-[-12px_0_40px_rgba(0,0,0,0.12)] transition-transform duration-300 ease-out",
-          entered ? "translate-x-0" : "translate-x-full",
+          'absolute inset-y-0 right-0 flex w-full max-w-100 flex-col bg-white shadow-[-12px_0_40px_rgba(0,0,0,0.12)] transition-transform duration-300 ease-out',
+          entered ? 'translate-x-0' : 'translate-x-full',
         )}
       >
         <div className="border-b border-[#ececec] px-6 py-6 sm:px-7">
@@ -86,9 +86,7 @@ export function AdminUserDetailDrawer({
         <div className="flex-1 overflow-y-auto px-6 py-8 sm:px-7">
           <div className="flex flex-col items-center text-center">
             <Avatar initials={user.initials} className="size-16 text-lg" />
-            <p className="mt-5 text-lg font-bold text-aurora-lime">
-              {user.name}
-            </p>
+            <p className="mt-5 text-lg font-bold text-aurora-lime">{user.name}</p>
             <p className="mt-2 text-sm text-[#8a8a8a]">{user.email}</p>
             <div className="mt-4">
               <Badge tone={statusTone(user.status)}>{user.status}</Badge>
@@ -99,10 +97,7 @@ export function AdminUserDetailDrawer({
             <StatCard label="Total Orders" value={String(user.orders)} />
             <StatCard label="Total Spent" value={user.totalSpent} />
             <StatCard label="Joined Since" value={user.joinedIso} />
-            <StatCard
-              label="Verified"
-              value={user.verified ? "Yes" : "No"}
-            />
+            <StatCard label="Verified" value={user.verified ? 'Yes' : 'No'} />
           </div>
 
           <div className="mt-12">
@@ -111,11 +106,9 @@ export function AdminUserDetailDrawer({
               <Button
                 variant="lime"
                 type="button"
-                onClick={() =>
-                  onStatusChange(isActive ? "Suspended" : "ACTIVE")
-                }
+                onClick={() => onStatusChange(isActive ? 'Suspended' : 'ACTIVE')}
               >
-                {isActive ? "Suspend Account" : "Activate Account"}
+                {isActive ? 'Suspend Account' : 'Activate Account'}
               </Button>
               <Button variant="outline" type="button">
                 Send Password Reset

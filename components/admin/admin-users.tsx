@@ -1,21 +1,21 @@
-"use client";
+'use client';
 
-import { useMemo, useState } from "react";
-import { AdminUserDetailDrawer } from "@/components/admin/admin-user-detail-drawer";
-import { Avatar } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
+import { useMemo, useState } from 'react';
+import { AdminUserDetailDrawer } from '@/components/admin/admin-user-detail-drawer';
+import { Avatar } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 import {
   ADMIN_USERS,
   ADMIN_USERS_TOTAL_COUNT,
   type AdminUser,
   type AdminUserStatus,
-} from "@/lib/admin";
-import { cn } from "@/lib/utils";
+} from '@/lib/admin';
+import { cn } from '@/lib/utils';
 
-const FILTERS = ["All Users", "Active", "Suspended"] as const;
+const FILTERS = ['All Users', 'Active', 'Suspended'] as const;
 
 function statusTone(status: AdminUserStatus) {
-  return status === "ACTIVE" ? ("green" as const) : ("red" as const);
+  return status === 'ACTIVE' ? ('green' as const) : ('red' as const);
 }
 
 function EyeIcon() {
@@ -42,23 +42,12 @@ function UserActionIcon() {
         strokeWidth="1.6"
         strokeLinecap="round"
       />
-      <path
-        d="M16.5 12.5h4.5"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
+      <path d="M16.5 12.5h4.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
     </svg>
   );
 }
 
-function UserRow({
-  user,
-  onOpen,
-}: {
-  user: AdminUser;
-  onOpen: (user: AdminUser) => void;
-}) {
+function UserRow({ user, onOpen }: { user: AdminUser; onOpen: (user: AdminUser) => void }) {
   return (
     <tr className="border-b border-[#ececec] last:border-b-0">
       <td className="py-4 pr-4">
@@ -72,21 +61,15 @@ function UserRow({
             <p className="truncate text-sm font-semibold text-aurora-lime hover:underline">
               {user.name}
             </p>
-            <p className="mt-0.5 truncate text-xs text-[#9a9a9a]">
-              {user.email}
-            </p>
+            <p className="mt-0.5 truncate text-xs text-[#9a9a9a]">{user.email}</p>
           </div>
         </button>
       </td>
-      <td className="px-3 py-4 text-sm whitespace-nowrap text-[#6b7280]">
-        {user.orders}
-      </td>
+      <td className="px-3 py-4 text-sm whitespace-nowrap text-[#6b7280]">{user.orders}</td>
       <td className="px-3 py-4 text-sm font-medium whitespace-nowrap text-aurora-ink">
         {user.totalSpent}
       </td>
-      <td className="px-3 py-4 text-sm whitespace-nowrap text-[#6b7280]">
-        {user.joined}
-      </td>
+      <td className="px-3 py-4 text-sm whitespace-nowrap text-[#6b7280]">{user.joined}</td>
       <td className="px-3 py-4">
         <Badge tone={statusTone(user.status)}>{user.status}</Badge>
       </td>
@@ -115,39 +98,31 @@ function UserRow({
 
 export function AdminUsers() {
   const [users, setUsers] = useState(ADMIN_USERS);
-  const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<(typeof FILTERS)[number]>("All Users");
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<(typeof FILTERS)[number]>('All Users');
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return users.filter((user) => {
       const matchesQuery =
-        !q ||
-        user.name.toLowerCase().includes(q) ||
-        user.email.toLowerCase().includes(q);
+        !q || user.name.toLowerCase().includes(q) || user.email.toLowerCase().includes(q);
 
       const matchesFilter =
-        filter === "All Users" ||
-        (filter === "Active" && user.status === "ACTIVE") ||
-        (filter === "Suspended" && user.status === "Suspended");
+        filter === 'All Users' ||
+        (filter === 'Active' && user.status === 'ACTIVE') ||
+        (filter === 'Suspended' && user.status === 'Suspended');
 
       return matchesQuery && matchesFilter;
     });
   }, [users, query, filter]);
 
   const selectedUser =
-    selectedId === null
-      ? null
-      : (users.find((user) => user.id === selectedId) ?? null);
+    selectedId === null ? null : (users.find((user) => user.id === selectedId) ?? null);
 
   function handleStatusChange(status: AdminUserStatus) {
     if (!selectedId) return;
-    setUsers((prev) =>
-      prev.map((user) =>
-        user.id === selectedId ? { ...user, status } : user,
-      ),
-    );
+    setUsers((prev) => prev.map((user) => (user.id === selectedId ? { ...user, status } : user)));
   }
 
   return (
@@ -156,9 +131,7 @@ export function AdminUsers() {
         <h1 className="text-[1.75rem] font-bold tracking-tight text-aurora-ink">
           Users Management
         </h1>
-        <p className="mt-1 text-sm text-[#8a8a8a]">
-          {ADMIN_USERS_TOTAL_COUNT} Registered users
-        </p>
+        <p className="mt-1 text-sm text-[#8a8a8a]">{ADMIN_USERS_TOTAL_COUNT} Registered users</p>
       </div>
 
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -184,9 +157,7 @@ export function AdminUsers() {
 
         <select
           value={filter}
-          onChange={(e) =>
-            setFilter(e.target.value as (typeof FILTERS)[number])
-          }
+          onChange={(e) => setFilter(e.target.value as (typeof FILTERS)[number])}
           className="h-11 rounded-xl border border-[#e5e5e5] bg-white px-3 text-sm font-medium text-aurora-ink outline-none focus:border-aurora-ink/30"
         >
           {FILTERS.map((option) => (
@@ -199,17 +170,10 @@ export function AdminUsers() {
 
       <div className="overflow-hidden rounded-2xl border border-[#e5e5e5] bg-white">
         <div className="overflow-x-auto px-5 sm:px-6">
-          <table className="w-full min-w-[880px] border-collapse text-left">
+          <table className="w-full min-w-220 border-collapse text-left">
             <thead>
               <tr className="border-b border-[#ececec]">
-                {[
-                  "User",
-                  "Orders",
-                  "Total Spent",
-                  "Joined",
-                  "Status",
-                  "Actions",
-                ].map((label) => (
+                {['User', 'Orders', 'Total Spent', 'Joined', 'Status', 'Actions'].map((label) => (
                   <th
                     key={label}
                     className="py-3.5 text-xs font-semibold tracking-wide text-[#9a9a9a] uppercase first:pr-4 last:pl-3 not-first:px-3"
@@ -222,20 +186,13 @@ export function AdminUsers() {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan={6}
-                    className="py-16 text-center text-sm text-[#8a8a8a]"
-                  >
+                  <td colSpan={6} className="py-16 text-center text-sm text-[#8a8a8a]">
                     No users match this search.
                   </td>
                 </tr>
               ) : (
                 filtered.map((user) => (
-                  <UserRow
-                    key={user.id}
-                    user={user}
-                    onOpen={(next) => setSelectedId(next.id)}
-                  />
+                  <UserRow key={user.id} user={user} onOpen={(next) => setSelectedId(next.id)} />
                 ))
               )}
             </tbody>
@@ -258,10 +215,10 @@ export function AdminUsers() {
                 key={page}
                 type="button"
                 className={cn(
-                  "inline-flex size-9 items-center justify-center rounded-lg text-sm font-semibold",
+                  'inline-flex size-9 items-center justify-center rounded-lg text-sm font-semibold',
                   page === 1
-                    ? "bg-aurora-lime text-aurora-ink"
-                    : "border border-[#e0e0e0] text-[#6b7280] hover:bg-[#f7f7f7]",
+                    ? 'bg-aurora-lime text-aurora-ink'
+                    : 'border border-[#e0e0e0] text-[#6b7280] hover:bg-[#f7f7f7]',
                 )}
               >
                 {page}

@@ -1,22 +1,22 @@
-"use client";
+'use client';
 
-import { useMemo, useState } from "react";
-import { AdminOrderDetailDrawer } from "@/components/admin/admin-order-detail-drawer";
-import { Badge } from "@/components/ui/badge";
+import { useMemo, useState } from 'react';
+import { AdminOrderDetailDrawer } from '@/components/admin/admin-order-detail-drawer';
+import { Badge } from '@/components/ui/badge';
 import {
   ADMIN_ORDERS,
   ADMIN_ORDERS_TOTAL_COUNT,
   type AdminOrder,
   type AdminOrderStatus,
-} from "@/lib/admin";
-import { cn } from "@/lib/utils";
+} from '@/lib/admin';
+import { cn } from '@/lib/utils';
 
-const FILTERS = ["All Orders", "Delivered", "In Transit", "Pending"] as const;
+const FILTERS = ['All Orders', 'Delivered', 'In Transit', 'Pending'] as const;
 
 function statusTone(status: AdminOrderStatus) {
-  if (status === "In Transit") return "blue" as const;
-  if (status === "Delivered") return "green" as const;
-  return "orange" as const;
+  if (status === 'In Transit') return 'blue' as const;
+  if (status === 'Delivered') return 'green' as const;
+  return 'orange' as const;
 }
 
 function EyeIcon() {
@@ -42,12 +42,7 @@ function InvoiceIcon() {
         strokeWidth="1.6"
         strokeLinejoin="round"
       />
-      <path
-        d="M15 3.5V7h3.8"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-      />
+      <path d="M15 3.5V7h3.8" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
       <path
         d="M9.5 12h5M9.5 15.5h5"
         stroke="currentColor"
@@ -69,13 +64,7 @@ function InvoiceIcon() {
   );
 }
 
-function OrderRow({
-  order,
-  onOpen,
-}: {
-  order: AdminOrder;
-  onOpen: (order: AdminOrder) => void;
-}) {
+function OrderRow({ order, onOpen }: { order: AdminOrder; onOpen: (order: AdminOrder) => void }) {
   return (
     <tr className="border-b border-[#ececec] last:border-b-0">
       <td className="py-4 pr-4">
@@ -88,28 +77,18 @@ function OrderRow({
         </button>
       </td>
       <td className="px-3 py-4">
-        <p className="text-sm font-semibold whitespace-nowrap text-aurora-ink">
-          {order.customer}
-        </p>
-        <p className="mt-0.5 text-xs whitespace-nowrap text-[#9a9a9a]">
-          {order.email}
-        </p>
+        <p className="text-sm font-semibold whitespace-nowrap text-aurora-ink">{order.customer}</p>
+        <p className="mt-0.5 text-xs whitespace-nowrap text-[#9a9a9a]">{order.email}</p>
       </td>
-      <td className="px-3 py-4 text-sm whitespace-nowrap text-[#6b7280]">
-        {order.items} Items
-      </td>
+      <td className="px-3 py-4 text-sm whitespace-nowrap text-[#6b7280]">{order.items} Items</td>
       <td className="px-3 py-4 text-sm font-medium whitespace-nowrap text-aurora-ink">
         {order.amount}
       </td>
-      <td className="px-3 py-4 text-sm whitespace-nowrap text-[#6b7280]">
-        {order.payment}
-      </td>
+      <td className="px-3 py-4 text-sm whitespace-nowrap text-[#6b7280]">{order.payment}</td>
       <td className="px-3 py-4">
         <Badge tone={statusTone(order.status)}>{order.status}</Badge>
       </td>
-      <td className="px-3 py-4 text-sm whitespace-nowrap text-[#6b7280]">
-        {order.date}
-      </td>
+      <td className="px-3 py-4 text-sm whitespace-nowrap text-[#6b7280]">{order.date}</td>
       <td className="py-4 pl-3">
         <div className="flex items-center gap-1.5">
           <button
@@ -135,8 +114,8 @@ function OrderRow({
 
 export function AdminOrders() {
   const [orders, setOrders] = useState(ADMIN_ORDERS);
-  const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<(typeof FILTERS)[number]>("All Orders");
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<(typeof FILTERS)[number]>('All Orders');
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
@@ -148,24 +127,19 @@ export function AdminOrders() {
         order.customer.toLowerCase().includes(q) ||
         order.email.toLowerCase().includes(q);
 
-      const matchesFilter =
-        filter === "All Orders" || order.status === filter;
+      const matchesFilter = filter === 'All Orders' || order.status === filter;
 
       return matchesQuery && matchesFilter;
     });
   }, [orders, query, filter]);
 
   const selectedOrder =
-    selectedId === null
-      ? null
-      : (orders.find((order) => order.id === selectedId) ?? null);
+    selectedId === null ? null : (orders.find((order) => order.id === selectedId) ?? null);
 
   function handleStatusChange(status: AdminOrderStatus) {
     if (!selectedId) return;
     setOrders((prev) =>
-      prev.map((order) =>
-        order.id === selectedId ? { ...order, status } : order,
-      ),
+      prev.map((order) => (order.id === selectedId ? { ...order, status } : order)),
     );
   }
 
@@ -175,9 +149,7 @@ export function AdminOrders() {
         <h1 className="text-[1.75rem] font-bold tracking-tight text-aurora-ink">
           Orders Management
         </h1>
-        <p className="mt-1 text-sm text-[#8a8a8a]">
-          {ADMIN_ORDERS_TOTAL_COUNT} Orders
-        </p>
+        <p className="mt-1 text-sm text-[#8a8a8a]">{ADMIN_ORDERS_TOTAL_COUNT} Orders</p>
       </div>
 
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -203,9 +175,7 @@ export function AdminOrders() {
 
         <select
           value={filter}
-          onChange={(e) =>
-            setFilter(e.target.value as (typeof FILTERS)[number])
-          }
+          onChange={(e) => setFilter(e.target.value as (typeof FILTERS)[number])}
           className="h-11 rounded-xl border border-[#e5e5e5] bg-white px-3 text-sm font-medium text-aurora-ink outline-none focus:border-aurora-ink/30"
         >
           {FILTERS.map((option) => (
@@ -218,18 +188,18 @@ export function AdminOrders() {
 
       <div className="overflow-hidden rounded-2xl border border-[#e5e5e5] bg-white">
         <div className="overflow-x-auto px-5 sm:px-6">
-          <table className="w-full min-w-[980px] border-collapse text-left">
+          <table className="w-full min-w-245 border-collapse text-left">
             <thead>
               <tr className="border-b border-[#ececec]">
                 {[
-                  "Order ID",
-                  "Customer",
-                  "Items",
-                  "Amount",
-                  "Payment",
-                  "Status",
-                  "Date",
-                  "Actions",
+                  'Order ID',
+                  'Customer',
+                  'Items',
+                  'Amount',
+                  'Payment',
+                  'Status',
+                  'Date',
+                  'Actions',
                 ].map((label) => (
                   <th
                     key={label}
@@ -243,10 +213,7 @@ export function AdminOrders() {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan={8}
-                    className="py-16 text-center text-sm text-[#8a8a8a]"
-                  >
+                  <td colSpan={8} className="py-16 text-center text-sm text-[#8a8a8a]">
                     No orders match this search.
                   </td>
                 </tr>
@@ -279,10 +246,10 @@ export function AdminOrders() {
                 key={page}
                 type="button"
                 className={cn(
-                  "inline-flex size-9 items-center justify-center rounded-lg text-sm font-semibold",
+                  'inline-flex size-9 items-center justify-center rounded-lg text-sm font-semibold',
                   page === 1
-                    ? "bg-aurora-lime text-aurora-ink"
-                    : "border border-[#e0e0e0] text-[#6b7280] hover:bg-[#f7f7f7]",
+                    ? 'bg-aurora-lime text-aurora-ink'
+                    : 'border border-[#e0e0e0] text-[#6b7280] hover:bg-[#f7f7f7]',
                 )}
               >
                 {page}

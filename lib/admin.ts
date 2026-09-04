@@ -636,3 +636,176 @@ export const ADMIN_USERS: AdminUser[] = [
 ];
 
 export const ADMIN_USERS_TOTAL_COUNT = 74;
+
+export type AdminProcurementStatus =
+  | "Approved"
+  | "Under Review"
+  | "Pending"
+  | "Rejected";
+
+export type AdminProcurementRequest = {
+  id: string;
+  contact: string;
+  email: string;
+  items: string;
+  amount: string;
+  status: AdminProcurementStatus;
+  date: string;
+  submitted: string;
+  institution: string;
+  department: string;
+  contactName: string;
+  contactEmail: string;
+  contactPhone: string;
+  requestedItems: string;
+  purpose: string;
+};
+
+export const ADMIN_PROCUREMENT_REQUESTS: AdminProcurementRequest[] = [
+  {
+    id: "PRQ-001",
+    contact: "Emeka Okafor",
+    email: "emeka.o@techlab.com",
+    items: "Arduino Uno R3; ESV...",
+    amount: "₦2,235,000",
+    status: "Approved",
+    date: "Apr 11, 2026",
+    submitted: "Submitted Apr 01, 2026",
+    institution: "TechLab Institute",
+    department: "Embedded Systems",
+    contactName: "Emeka Okafor",
+    contactEmail: "emeka.o@techlab.com",
+    contactPhone: "+234 803 111 2233",
+    requestedItems:
+      "Arduino Uno R3 (50 units), ESP32 DevKit (30 units), DHT22 Sensor (40 units)",
+    purpose: "Undergraduate electronics lab restock",
+  },
+  {
+    id: "PRQ-002",
+    contact: "Chinedu Okoro",
+    email: "chinedu.o@edulab.ng",
+    items: "Raspberry Pi 4; Node...",
+    amount: "₦2,235,000",
+    status: "Under Review",
+    date: "Apr 11, 2026",
+    submitted: "Submitted Apr 02, 2026",
+    institution: "Covenant University",
+    department: "Computer Engineering",
+    contactName: "Prof. Aisha Bello",
+    contactEmail: "aisha.b@covenantuni.edu.ng",
+    contactPhone: "+234 805 234 5678",
+    requestedItems:
+      "Raspberry PI 4 (20 units), Camera Module V2 (20 units), MPU-6050 (40 units)",
+    purpose: "Robotics research lab setup",
+  },
+  {
+    id: "PRQ-003",
+    contact: "Amaka Nwosu",
+    email: "amaka.n@stemhub.com",
+    items: "DC Gear Motor 110RP...",
+    amount: "₦2,235,000",
+    status: "Pending",
+    date: "Apr 10, 2026",
+    submitted: "Submitted Apr 03, 2026",
+    institution: "STEM Hub Academy",
+    department: "Mechatronics",
+    contactName: "Amaka Nwosu",
+    contactEmail: "amaka.n@stemhub.com",
+    contactPhone: "+234 809 444 1122",
+    requestedItems:
+      "DC Gear Motor 110RPM (60 units), Motor Driver Shield (30 units)",
+    purpose: "Secondary school robotics workshop",
+  },
+  {
+    id: "PRQ-004",
+    contact: "Ibrahim Musa",
+    email: "ibrahim.m@makerlab.ng",
+    items: "ESP32 DevKit; DHT22...",
+    amount: "₦2,235,000",
+    status: "Rejected",
+    date: "Apr 10, 2026",
+    submitted: "Submitted Mar 28, 2026",
+    institution: "Maker Lab NG",
+    department: "IoT Projects",
+    contactName: "Ibrahim Musa",
+    contactEmail: "ibrahim.m@makerlab.ng",
+    contactPhone: "+234 701 555 8899",
+    requestedItems:
+      "ESP32 DevKit (100 units), DHT22 Sensor (80 units), Breadboard (50 units)",
+    purpose: "Community maker space kit expansion",
+  },
+  {
+    id: "PRQ-005",
+    contact: "Fatima Aliyu",
+    email: "fatima.a@techschool.edu",
+    items: "L298N Motor Module;...",
+    amount: "₦2,235,000",
+    status: "Approved",
+    date: "Apr 09, 2026",
+    submitted: "Submitted Mar 30, 2026",
+    institution: "Federal Tech School",
+    department: "Electrical Engineering",
+    contactName: "Fatima Aliyu",
+    contactEmail: "fatima.a@techschool.edu",
+    contactPhone: "+234 802 333 6677",
+    requestedItems:
+      "L298N Motor Module (40 units), Jumper Wire Kit (25 packs)",
+    purpose: "Practical motor control classes",
+  },
+  {
+    id: "PRQ-006",
+    contact: "Tunde Bakare",
+    email: "tunde.b@robotics.ng",
+    items: "NEMA 17 Stepper; Dr...",
+    amount: "₦2,235,000",
+    status: "Under Review",
+    date: "Apr 09, 2026",
+    submitted: "Submitted Apr 04, 2026",
+    institution: "Robotics NG",
+    department: "Automation",
+    contactName: "Tunde Bakare",
+    contactEmail: "tunde.b@robotics.ng",
+    contactPhone: "+234 813 222 4455",
+    requestedItems:
+      "NEMA 17 Stepper (35 units), Driver Board (35 units), Couplers (70 units)",
+    purpose: "CNC prototype training kits",
+  },
+  {
+    id: "PRQ-007",
+    contact: "Ngozi Eze",
+    email: "ngozi.e@iotlab.com",
+    items: "OLED 128×64; Bread...",
+    amount: "₦2,235,000",
+    status: "Pending",
+    date: "Apr 08, 2026",
+    submitted: "Submitted Apr 05, 2026",
+    institution: "IoT Lab Africa",
+    department: "Hardware Design",
+    contactName: "Ngozi Eze",
+    contactEmail: "ngozi.e@iotlab.com",
+    contactPhone: "+234 706 998 1100",
+    requestedItems:
+      "OLED 128×64 Display (45 units), Breadboard (45 units), Resistor Kit (20 packs)",
+    purpose: "Display interface prototyping course",
+  },
+  {
+    id: "PRQ-008",
+    contact: "Yusuf Bello",
+    email: "yusuf.b@engdept.edu",
+    items: "12V 5A Power Supply...",
+    amount: "₦2,235,000",
+    status: "Approved",
+    date: "Apr 08, 2026",
+    submitted: "Submitted Mar 25, 2026",
+    institution: "State Engineering Dept",
+    department: "Power Systems",
+    contactName: "Yusuf Bello",
+    contactEmail: "yusuf.b@engdept.edu",
+    contactPhone: "+234 807 654 3210",
+    requestedItems:
+      "12V 5A Power Supply (25 units), Terminal Blocks (100 units)",
+    purpose: "Lab bench power upgrade",
+  },
+];
+
+export const ADMIN_PROCUREMENT_AWAITING_REVIEW = 2;
