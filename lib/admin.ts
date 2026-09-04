@@ -228,7 +228,34 @@ export type CatalogProduct = {
   minStock: number;
   status: CatalogStatus;
   image: string;
+  specs?: string;
 };
+
+export const CATALOG_CATEGORIES = [
+  "Microcontrollers",
+  "Sensors",
+  "Motors",
+  "Powers",
+  "Single Board Computers",
+] as const;
+
+export const CATALOG_STATUS_OPTIONS: { label: string; value: CatalogStatus }[] =
+  [
+    { label: "In Stock", value: "IN STOCK" },
+    { label: "Low Stock", value: "LOW STOCK" },
+    { label: "Critical", value: "CRITICAL" },
+    { label: "Out of Stock", value: "OUT OF STOCK" },
+  ];
+
+export function parseCatalogPrice(priceLabel: string) {
+  return priceLabel.replace(/[₦,\s]/g, "");
+}
+
+export function formatCatalogPrice(price: string) {
+  const digits = price.replace(/[^\d]/g, "");
+  if (!digits) return "₦0";
+  return `₦${Number(digits).toLocaleString("en-NG")}`;
+}
 
 export const CATALOG_PRODUCTS: CatalogProduct[] = [
   {

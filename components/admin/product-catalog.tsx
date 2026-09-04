@@ -2,6 +2,8 @@
 
 import Image from "next/image";
 import { useMemo, useState } from "react";
+import { EditProductModal } from "@/components/admin/edit-product-modal";
+import { RemoveProductModal } from "@/components/admin/remove-product-modal";
 import {
   CATALOG_PRODUCTS,
   CATALOG_TOTAL_COUNT,
@@ -100,9 +102,11 @@ function StockCell({ product }: { product: CatalogProduct }) {
 
 function ProductRow({
   product,
+  onEdit,
   onDelete,
 }: {
   product: CatalogProduct;
+  onEdit: (product: CatalogProduct) => void;
   onDelete: (id: string) => void;
 }) {
   return (
@@ -145,6 +149,7 @@ function ProductRow({
         <div className="flex items-center gap-1.5">
           <button
             type="button"
+            onClick={() => onEdit(product)}
             className="inline-flex size-8 items-center justify-center rounded-lg border border-[#e0e0e0] text-[#6b7280] transition-colors hover:bg-[#f7f7f7] hover:text-aurora-ink"
             aria-label={`Edit ${product.name}`}
           >
@@ -170,6 +175,9 @@ export function ProductCatalog() {
   const [products, setProducts] = useState(CATALOG_PRODUCTS);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("All Products");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [isAdding, setIsAdding] = useState(false);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -191,8 +199,31 @@ export function ProductCatalog() {
     });
   }, [products, query, filter]);
 
+  const editingProduct =
+    editingId === null
+      ? null
+      : (products.find((product) => product.id === editingId) ?? null);
+
+  const removingProduct =
+    removingId === null
+      ? null
+      : (products.find((product) => product.id === removingId) ?? null);
+
   function handleDelete(id: string) {
     setProducts((prev) => prev.filter((p) => p.id !== id));
+    setRemovingId(null);
+  }
+
+  function handleSave(next: CatalogProduct) {
+    setProducts((prev) => {
+      const exists = prev.some((product) => product.id === next.id);
+      if (exists) {
+        return prev.map((product) => (product.id === next.id ? next : product));
+      }
+      return [next, ...prev];
+    });
+    setEditingId(null);
+    setIsAdding(false);
   }
 
   return (
@@ -209,6 +240,10 @@ export function ProductCatalog() {
 
         <button
           type="button"
+          onClick={() => {
+            setEditingId(null);
+            setIsAdding(true);
+          }}
           className="inline-flex h-11 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-aurora-lime px-4 text-sm font-semibold text-aurora-ink transition-opacity hover:opacity-90"
         >
           <span aria-hidden className="text-lg leading-none">
@@ -292,7 +327,11 @@ export function ProductCatalog() {
                   <ProductRow
                     key={product.id}
                     product={product}
-                    onDelete={handleDelete}
+                    onEdit={(next) => {
+                      setIsAdding(false);
+                      setEditingId(next.id);
+                    }}
+                    onDelete={(id) => setRemovingId(id)}
                   />
                 ))
               )}
@@ -341,6 +380,31 @@ export function ProductCatalog() {
           </div>
         </div>
       </div>
+
+      {editingProduct ? (
+        <EditProductModal
+          mode="edit"
+          product={editingProduct}
+          onClose={() => setEditingId(null)}
+          onSave={handleSave}
+        />
+      ) : null}
+
+      {isAdding ? (
+        <EditProductModal
+          mode="add"
+          onClose={() => setIsAdding(false)}
+          onSave={handleSave}
+        />
+      ) : null}
+
+      {removingProduct ? (
+        <RemoveProductModal
+          product={removingProduct}
+          onClose={() => setRemovingId(null)}
+          onConfirm={() => handleDelete(removingProduct.id)}
+        />
+      ) : null}
     </div>
   );
 }
