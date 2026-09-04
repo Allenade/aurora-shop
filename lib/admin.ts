@@ -508,3 +508,131 @@ export const ADMIN_ORDERS: AdminOrder[] = [
 ];
 
 export const ADMIN_ORDERS_TOTAL_COUNT = 17;
+
+export type AdminUserStatus = "ACTIVE" | "Suspended";
+
+export type AdminUser = {
+  id: string;
+  name: string;
+  email: string;
+  initials: string;
+  orders: number;
+  totalSpent: string;
+  joined: string;
+  joinedIso: string;
+  verified: boolean;
+  status: AdminUserStatus;
+};
+
+export const ADMIN_USERS: AdminUser[] = [
+  {
+    id: "u1",
+    name: "Emeka Okafor",
+    email: "emeka.o@email.com",
+    initials: "EO",
+    orders: 24,
+    totalSpent: "₦620,000",
+    joined: "Apr 16, 2026",
+    joinedIso: "2026-01-02",
+    verified: true,
+    status: "ACTIVE",
+  },
+  {
+    id: "u2",
+    name: "Chinedu Okoro",
+    email: "chinedu.o@email.com",
+    initials: "CO",
+    orders: 4,
+    totalSpent: "₦15,000",
+    joined: "Apr 14, 2026",
+    joinedIso: "2026-02-18",
+    verified: true,
+    status: "ACTIVE",
+  },
+  {
+    id: "u3",
+    name: "Amaka Nwosu",
+    email: "amaka.n@email.com",
+    initials: "AN",
+    orders: 3,
+    totalSpent: "₦42,500",
+    joined: "Apr 12, 2026",
+    joinedIso: "2026-03-01",
+    verified: false,
+    status: "Suspended",
+  },
+  {
+    id: "u4",
+    name: "Ibrahim Musa",
+    email: "ibrahim.m@email.com",
+    initials: "IM",
+    orders: 81,
+    totalSpent: "₦1,240,000",
+    joined: "Apr 10, 2026",
+    joinedIso: "2025-11-12",
+    verified: true,
+    status: "ACTIVE",
+  },
+  {
+    id: "u5",
+    name: "Fatima Aliyu",
+    email: "fatima.a@email.com",
+    initials: "FA",
+    orders: 12,
+    totalSpent: "₦186,000",
+    joined: "Apr 08, 2026",
+    joinedIso: "2026-01-20",
+    verified: true,
+    status: "ACTIVE",
+  },
+  {
+    id: "u6",
+    name: "Tunde Bakare",
+    email: "tunde.b@email.com",
+    initials: "TB",
+    orders: 7,
+    totalSpent: "₦98,000",
+    joined: "Apr 06, 2026",
+    joinedIso: "2026-02-05",
+    verified: false,
+    status: "Suspended",
+  },
+  {
+    id: "u7",
+    name: "Ngozi Eze",
+    email: "ngozi.e@email.com",
+    initials: "NE",
+    orders: 19,
+    totalSpent: "₦345,000",
+    joined: "Apr 04, 2026",
+    joinedIso: "2025-12-08",
+    verified: true,
+    status: "ACTIVE",
+  },
+  {
+    id: "u8",
+    name: "Yusuf Bello",
+    email: "yusuf.b@email.com",
+    initials: "YB",
+    orders: 2,
+    totalSpent: "₦28,000",
+    joined: "Apr 02, 2026",
+    joinedIso: "2026-03-15",
+    verified: true,
+    status: "ACTIVE",
+  },
+  {
+    id: "u9",
+    name: "Adaeze Okonkwo",
+    email: "adaeze.o@email.com",
+    initials: "AO",
+    orders: 15,
+    totalSpent: "₦412,000",
+    joined: "Mar 30, 2026",
+    joinedIso: "2025-10-22",
+    verified: false,
+    status: "Suspended",
+  },
+];
+
+export const ADMIN_USERS_TOTAL_COUNT = 74;
