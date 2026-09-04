@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { AdminProviders } from "@/components/providers/admin-providers";
+import { getCurrentUser } from "@/lib/bff/auth";
 
 export const metadata: Metadata = {
   title: {
@@ -9,13 +11,17 @@ export const metadata: Metadata = {
   },
 };
 
-export default function AdminLayout({
+export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const user = await getCurrentUser();
+  if (!user) redirect("/auth/signin");
+  if (user.type !== "admin") redirect("/dashboard");
+
   return (
-    <AdminProviders>
+    <AdminProviders user={user}>
       <AdminShell>{children}</AdminShell>
     </AdminProviders>
   );
