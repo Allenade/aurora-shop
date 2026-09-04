@@ -330,3 +330,181 @@ export const CATALOG_PRODUCTS: CatalogProduct[] = [
 ];
 
 export const CATALOG_TOTAL_COUNT = 103;
+
+export type AdminOrderStatus = "Delivered" | "In Transit" | "Pending";
+
+export type AdminOrderPayment = "Bank Transfer" | "Card";
+
+export type AdminOrder = {
+  id: string;
+  customer: string;
+  email: string;
+  initials: string;
+  items: number;
+  amount: string;
+  total: string;
+  payment: AdminOrderPayment;
+  status: AdminOrderStatus;
+  date: string;
+};
+
+export type AdminOrderTimelineStep = {
+  id: string;
+  label: string;
+  at: string;
+  status: "done" | "current" | "upcoming";
+};
+
+export function buildAdminOrderTimeline(
+  status: AdminOrderStatus,
+): AdminOrderTimelineStep[] {
+  const steps = [
+    { id: "placed", label: "Order Placed", at: "2026-03-01 10:30 AM" },
+    { id: "paid", label: "Payment Confirmed", at: "2026-03-01 10:30 AM" },
+    { id: "packing", label: "Processing & Packing", at: "2026-03-01 10:30 AM" },
+    { id: "transit", label: "In Transit", at: "2026-03-01 10:30 AM" },
+    {
+      id: "delivered",
+      label: "Delivered",
+      at: "Expected 2026-03-14 12:00 PM",
+    },
+  ] as const;
+
+  if (status === "Delivered") {
+    return steps.map((step) => ({
+      ...step,
+      at: step.id === "delivered" ? "2026-03-14 12:00 PM" : step.at,
+      status: "done" as const,
+    }));
+  }
+
+  if (status === "In Transit") {
+    return steps.map((step, index) => ({
+      ...step,
+      status: index < 4 ? ("done" as const) : ("upcoming" as const),
+    }));
+  }
+
+  return steps.map((step, index) => ({
+    ...step,
+    status:
+      index === 0
+        ? ("done" as const)
+        : index === 1
+          ? ("current" as const)
+          : ("upcoming" as const),
+  }));
+}
+
+export const ADMIN_ORDERS: AdminOrder[] = [
+  {
+    id: "ORD - 2026 - 321",
+    customer: "Emeka Okafor",
+    email: "emeka.o@email.com",
+    initials: "EO",
+    items: 8,
+    amount: "₦235,000",
+    total: "₦235,000.00",
+    payment: "Bank Transfer",
+    status: "Delivered",
+    date: "Apr 11, 2026",
+  },
+  {
+    id: "ORD - 2026 - 320",
+    customer: "Chinedu Okoro",
+    email: "chinedu.o@email.com",
+    initials: "CO",
+    items: 24,
+    amount: "₦890,000",
+    total: "₦890,000.00",
+    payment: "Card",
+    status: "In Transit",
+    date: "Apr 11, 2026",
+  },
+  {
+    id: "ORD - 2026 - 319",
+    customer: "Amaka Nwosu",
+    email: "amaka.n@email.com",
+    initials: "AN",
+    items: 5,
+    amount: "₦156,000",
+    total: "₦156,000.00",
+    payment: "Bank Transfer",
+    status: "Pending",
+    date: "Apr 10, 2026",
+  },
+  {
+    id: "ORD - 2026 - 318",
+    customer: "Ibrahim Musa",
+    email: "ibrahim.m@email.com",
+    initials: "IM",
+    items: 12,
+    amount: "₦445,000",
+    total: "₦445,000.00",
+    payment: "Card",
+    status: "Delivered",
+    date: "Apr 10, 2026",
+  },
+  {
+    id: "ORD - 2026 - 317",
+    customer: "Fatima Aliyu",
+    email: "fatima.a@email.com",
+    initials: "FA",
+    items: 3,
+    amount: "₦78,000",
+    total: "₦78,000.00",
+    payment: "Bank Transfer",
+    status: "Pending",
+    date: "Apr 09, 2026",
+  },
+  {
+    id: "ORD - 2026 - 316",
+    customer: "Tunde Bakare",
+    email: "tunde.b@email.com",
+    initials: "TB",
+    items: 18,
+    amount: "₦672,000",
+    total: "₦672,000.00",
+    payment: "Card",
+    status: "In Transit",
+    date: "Apr 09, 2026",
+  },
+  {
+    id: "ORD - 2026 - 315",
+    customer: "Ngozi Eze",
+    email: "ngozi.e@email.com",
+    initials: "NE",
+    items: 7,
+    amount: "₦298,000",
+    total: "₦298,000.00",
+    payment: "Bank Transfer",
+    status: "Delivered",
+    date: "Apr 08, 2026",
+  },
+  {
+    id: "ORD - 2026 - 314",
+    customer: "Yusuf Bello",
+    email: "yusuf.b@email.com",
+    initials: "YB",
+    items: 15,
+    amount: "₦521,000",
+    total: "₦521,000.00",
+    payment: "Card",
+    status: "Pending",
+    date: "Apr 08, 2026",
+  },
+  {
+    id: "ORD - 2026 - 313",
+    customer: "Adaeze Okonkwo",
+    email: "adaeze.o@email.com",
+    initials: "AO",
+    items: 9,
+    amount: "₦367,000",
+    total: "₦367,000.00",
+    payment: "Bank Transfer",
+    status: "In Transit",
+    date: "Apr 07, 2026",
+  },
+];
+
+export const ADMIN_ORDERS_TOTAL_COUNT = 17;
