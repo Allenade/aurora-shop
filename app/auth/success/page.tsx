@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { AuroraLogo } from "@/components/auth/aurora-logo";
-import { AuthButton } from "@/components/auth/form-controls";
 
 const HIGHLIGHTS = [
   { title: "15k+ Products", icon: "bag" },

@@ -50,6 +50,7 @@ function readReceipts(): OrderReceipt[] {
 function writeReceipts(receipts: OrderReceipt[]) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(receipts));
+  window.dispatchEvent(new Event("aurora-receipts-changed"));
 }
 
 export function getSavedReceipts(): OrderReceipt[] {
