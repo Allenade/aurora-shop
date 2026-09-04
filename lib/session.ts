@@ -2,8 +2,8 @@ import type { SessionUser } from "@/lib/permissions/permissions.types";
 import { Action, Resource } from "@/lib/permissions/permissions.types";
 
 /**
- * Mock logged-in buyer (procurement).
- * Later: replace with GET /auth/me from the API.
+ * Mock buyer (procurement) — used by BFF upstream while AUTH_MODE=mock.
+ * Real backend will replace this via GET /auth/me through the BFF.
  */
 export const MOCK_SESSION_USER: SessionUser = {
   id: "user_1",
@@ -41,8 +41,7 @@ export const MOCK_SESSION_USER: SessionUser = {
 };
 
 /**
- * Mock logged-in admin (Super Admin).
- * Used by the `(admin)` route tree only until real auth is wired.
+ * Mock admin (Super Admin) — used by BFF upstream while AUTH_MODE=mock.
  */
 export const MOCK_ADMIN_SESSION_USER: SessionUser = {
   id: "admin_1",
@@ -93,10 +92,12 @@ export const MOCK_ADMIN_SESSION_USER: SessionUser = {
   ],
 };
 
+/** @deprecated Use getCurrentUser() from @/lib/bff/auth in server code. */
 export function getSessionUser(): SessionUser {
   return MOCK_SESSION_USER;
 }
 
+/** @deprecated Use getCurrentUser() from @/lib/bff/auth in server code. */
 export function getAdminSessionUser(): SessionUser {
   return MOCK_ADMIN_SESSION_USER;
 }
