@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { SearchInput } from "@/components/ui/search-input";
 import { UserMenu } from "@/components/layout/user-menu";
 
@@ -55,13 +56,13 @@ export function TopBar({
 
         <div className="ml-auto flex shrink-0 items-center gap-2">
           {showCart ? (
-            <button
-              type="button"
+            <Link
+              href="/cart"
               className="inline-flex size-10 items-center justify-center rounded-full text-[#5f5f5f] hover:bg-[#f6f6f6]"
               aria-label="Cart"
             >
               <CartIcon />
-            </button>
+            </Link>
           ) : null}
           <button
             type="button"

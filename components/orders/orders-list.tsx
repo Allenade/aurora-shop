@@ -26,20 +26,28 @@ export function OrdersList() {
         </p>
       </div>
 
-      <div className="rounded-2xl border border-[#e5e5e5] bg-white px-5 py-5 sm:px-6">
-        <OrdersFilterTabs
-          value={filter}
-          onChange={setFilter}
-          counts={counts}
-        />
+      <div className="rounded-2xl border border-[#e5e5e5] bg-white">
+        <div className="border-b border-[#ececec] px-5 pt-5 pb-4 sm:px-6">
+          <OrdersFilterTabs
+            value={filter}
+            onChange={setFilter}
+            counts={counts}
+          />
+        </div>
 
-        <div className="mt-2">
+        <div className="px-5 sm:px-6">
           {orders.length === 0 ? (
             <div className="py-16 text-center text-sm text-[#8a8a8a]">
               No orders in this filter.
             </div>
           ) : (
-            orders.map((order) => <OrderRow key={order.id} order={order} />)
+            <ul className="divide-y divide-[#ececec]">
+              {orders.map((order) => (
+                <li key={order.id}>
+                  <OrderRow order={order} />
+                </li>
+              ))}
+            </ul>
           )}
         </div>
       </div>

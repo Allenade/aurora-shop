@@ -60,19 +60,13 @@ export function ProductCard({ product }: { product: ShopProduct }) {
           </p>
         </div>
 
-        <div className="mt-4 flex items-stretch gap-2">
+        <div className="mt-4">
           <Link
-            href={`/shop/${product.slug}`}
-            className="inline-flex h-10 min-w-0 flex-1 items-center justify-center whitespace-nowrap rounded-lg bg-aurora-lime px-2 text-sm font-semibold text-aurora-ink transition-opacity hover:opacity-90"
-          >
-            Buy Now
-          </Link>
-          <button
-            type="button"
-            className="inline-flex h-10 min-w-0 flex-1 items-center justify-center whitespace-nowrap rounded-lg border border-[#cfcfcf] bg-white px-2 text-sm font-semibold text-aurora-ink transition-colors hover:bg-[#f7f7f7]"
+            href={`/cart?add=${encodeURIComponent(product.slug)}`}
+            className="inline-flex h-10 w-full items-center justify-center whitespace-nowrap rounded-lg bg-aurora-lime px-3 text-sm font-semibold text-aurora-ink transition-opacity hover:opacity-90"
           >
             Add to Cart
-          </button>
+          </Link>
         </div>
       </div>
     </Card>

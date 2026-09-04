@@ -2,7 +2,7 @@ import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react
 import { cn } from "@/lib/utils";
 
 type FieldProps = {
-  label: string;
+  label: ReactNode;
   htmlFor: string;
   children: ReactNode;
   className?: string;

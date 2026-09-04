@@ -30,7 +30,7 @@ export function OrderPaymentCard({ order }: { order: OrderRecord }) {
           <dt className="text-[#6b7280]">Tracking Number</dt>
           <dd>
             <Link
-              href="/track-orders"
+              href={`/track-orders?q=${encodeURIComponent(order.trackingNumber)}`}
               className="font-medium text-[#2f6fed] underline-offset-2 hover:underline"
             >
               {order.trackingNumber}

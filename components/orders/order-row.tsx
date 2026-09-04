@@ -65,10 +65,13 @@ export function OrderRow({ order }: { order: OrderRecord }) {
       ? { label: "Re-order", href: "/shop" }
       : order.status === "Cancelled"
         ? null
-        : { label: "Track Order", href: "/track-orders" };
+        : {
+            label: "Track Order",
+            href: `/track-orders?q=${encodeURIComponent(order.trackingNumber)}`,
+          };
 
   return (
-    <div className="flex flex-col gap-4 border-b border-[#e8e8e8] py-5 last:border-b-0 sm:flex-row sm:items-start sm:justify-between sm:gap-8">
+    <div className="flex flex-col gap-4 py-5 sm:flex-row sm:items-center sm:justify-between sm:gap-8">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2.5">
           <h3 className="text-base font-bold text-aurora-ink">{order.id}</h3>
@@ -90,7 +93,7 @@ export function OrderRow({ order }: { order: OrderRecord }) {
           </span>
         </div>
 
-        <p className="mt-2.5 text-sm text-[#6b7280]">
+        <p className="mt-2.5 text-sm leading-relaxed text-[#6b7280]">
           <span className="font-medium text-[#8a8a8a]">Products: </span>
           {formatProductSummary(order.products)}
         </p>
@@ -113,7 +116,7 @@ export function OrderRow({ order }: { order: OrderRecord }) {
         </div>
       </div>
 
-      <p className="shrink-0 text-lg font-bold text-aurora-ink sm:pt-0.5 sm:text-right sm:text-xl">
+      <p className="shrink-0 text-lg font-bold whitespace-nowrap text-aurora-ink sm:self-center sm:text-right sm:text-xl">
         {order.total}
       </p>
     </div>

@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Track Order",
+  title: "Settings",
 };
 
-export default function TrackOrdersLayout({
+export default function SettingsLayout({
   children,
 }: {
   children: React.ReactNode;

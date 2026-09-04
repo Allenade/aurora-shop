@@ -62,7 +62,7 @@ export const ORDERS: OrderRecord[] = [
     date: "Mar 3, 2026",
     placedAt: "Mar 3, 2026 15:57PM",
     itemCount: 6,
-    reference: "TRK-2024-1041",
+    reference: "TRK-897420",
     products: [
       "Arduino Uno R3",
       "DHT22 Sensor",
@@ -81,7 +81,7 @@ export const ORDERS: OrderRecord[] = [
     taxLabel: "₦5,000.00",
     paymentMethod: "Bank Transfer",
     paymentStatus: "Paid",
-    trackingNumber: "TRK-2024-1041",
+    trackingNumber: "TRK-897420",
     shippingName: "Benjamin Jacobs",
     shippingAddress: "50 Adekunle Banjo Street, Magodo Phase II, Lagos, Nigeria",
     shippingPhone: "+234 803 444 7553",

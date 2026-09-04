@@ -1,15 +1,12 @@
 "use client";
 
-import { PagePlaceholder } from "@/components/page/page-placeholder";
+import { SettingsPage } from "@/components/settings/settings-page";
 import { Action, Resource, RequirePermission } from "@/lib/permissions";
 
-export default function SettingsPage() {
+export default function SettingsRoutePage() {
   return (
     <RequirePermission action={Action.READ} resource={Resource.SETTINGS}>
-      <PagePlaceholder
-        title="Settings"
-        description="Account settings — this page will get components/settings/ next."
-      />
+      <SettingsPage />
     </RequirePermission>
   );
 }
