@@ -228,7 +228,34 @@ export type CatalogProduct = {
   minStock: number;
   status: CatalogStatus;
   image: string;
+  specs?: string;
 };
+
+export const CATALOG_CATEGORIES = [
+  "Microcontrollers",
+  "Sensors",
+  "Motors",
+  "Powers",
+  "Single Board Computers",
+] as const;
+
+export const CATALOG_STATUS_OPTIONS: { label: string; value: CatalogStatus }[] =
+  [
+    { label: "In Stock", value: "IN STOCK" },
+    { label: "Low Stock", value: "LOW STOCK" },
+    { label: "Critical", value: "CRITICAL" },
+    { label: "Out of Stock", value: "OUT OF STOCK" },
+  ];
+
+export function parseCatalogPrice(priceLabel: string) {
+  return priceLabel.replace(/[₦,\s]/g, "");
+}
+
+export function formatCatalogPrice(price: string) {
+  const digits = price.replace(/[^\d]/g, "");
+  if (!digits) return "₦0";
+  return `₦${Number(digits).toLocaleString("en-NG")}`;
+}
 
 export const CATALOG_PRODUCTS: CatalogProduct[] = [
   {
@@ -330,3 +357,482 @@ export const CATALOG_PRODUCTS: CatalogProduct[] = [
 ];
 
 export const CATALOG_TOTAL_COUNT = 103;
+
+export type AdminOrderStatus = "Delivered" | "In Transit" | "Pending";
+
+export type AdminOrderPayment = "Bank Transfer" | "Card";
+
+export type AdminOrder = {
+  id: string;
+  customer: string;
+  email: string;
+  initials: string;
+  items: number;
+  amount: string;
+  total: string;
+  payment: AdminOrderPayment;
+  status: AdminOrderStatus;
+  date: string;
+};
+
+export type AdminOrderTimelineStep = {
+  id: string;
+  label: string;
+  at: string;
+  status: "done" | "current" | "upcoming";
+};
+
+export function buildAdminOrderTimeline(
+  status: AdminOrderStatus,
+): AdminOrderTimelineStep[] {
+  const steps = [
+    { id: "placed", label: "Order Placed", at: "2026-03-01 10:30 AM" },
+    { id: "paid", label: "Payment Confirmed", at: "2026-03-01 10:30 AM" },
+    { id: "packing", label: "Processing & Packing", at: "2026-03-01 10:30 AM" },
+    { id: "transit", label: "In Transit", at: "2026-03-01 10:30 AM" },
+    {
+      id: "delivered",
+      label: "Delivered",
+      at: "Expected 2026-03-14 12:00 PM",
+    },
+  ] as const;
+
+  if (status === "Delivered") {
+    return steps.map((step) => ({
+      ...step,
+      at: step.id === "delivered" ? "2026-03-14 12:00 PM" : step.at,
+      status: "done" as const,
+    }));
+  }
+
+  if (status === "In Transit") {
+    return steps.map((step, index) => ({
+      ...step,
+      status: index < 4 ? ("done" as const) : ("upcoming" as const),
+    }));
+  }
+
+  return steps.map((step, index) => ({
+    ...step,
+    status:
+      index === 0
+        ? ("done" as const)
+        : index === 1
+          ? ("current" as const)
+          : ("upcoming" as const),
+  }));
+}
+
+export const ADMIN_ORDERS: AdminOrder[] = [
+  {
+    id: "ORD - 2026 - 321",
+    customer: "Emeka Okafor",
+    email: "emeka.o@email.com",
+    initials: "EO",
+    items: 8,
+    amount: "₦235,000",
+    total: "₦235,000.00",
+    payment: "Bank Transfer",
+    status: "Delivered",
+    date: "Apr 11, 2026",
+  },
+  {
+    id: "ORD - 2026 - 320",
+    customer: "Chinedu Okoro",
+    email: "chinedu.o@email.com",
+    initials: "CO",
+    items: 24,
+    amount: "₦890,000",
+    total: "₦890,000.00",
+    payment: "Card",
+    status: "In Transit",
+    date: "Apr 11, 2026",
+  },
+  {
+    id: "ORD - 2026 - 319",
+    customer: "Amaka Nwosu",
+    email: "amaka.n@email.com",
+    initials: "AN",
+    items: 5,
+    amount: "₦156,000",
+    total: "₦156,000.00",
+    payment: "Bank Transfer",
+    status: "Pending",
+    date: "Apr 10, 2026",
+  },
+  {
+    id: "ORD - 2026 - 318",
+    customer: "Ibrahim Musa",
+    email: "ibrahim.m@email.com",
+    initials: "IM",
+    items: 12,
+    amount: "₦445,000",
+    total: "₦445,000.00",
+    payment: "Card",
+    status: "Delivered",
+    date: "Apr 10, 2026",
+  },
+  {
+    id: "ORD - 2026 - 317",
+    customer: "Fatima Aliyu",
+    email: "fatima.a@email.com",
+    initials: "FA",
+    items: 3,
+    amount: "₦78,000",
+    total: "₦78,000.00",
+    payment: "Bank Transfer",
+    status: "Pending",
+    date: "Apr 09, 2026",
+  },
+  {
+    id: "ORD - 2026 - 316",
+    customer: "Tunde Bakare",
+    email: "tunde.b@email.com",
+    initials: "TB",
+    items: 18,
+    amount: "₦672,000",
+    total: "₦672,000.00",
+    payment: "Card",
+    status: "In Transit",
+    date: "Apr 09, 2026",
+  },
+  {
+    id: "ORD - 2026 - 315",
+    customer: "Ngozi Eze",
+    email: "ngozi.e@email.com",
+    initials: "NE",
+    items: 7,
+    amount: "₦298,000",
+    total: "₦298,000.00",
+    payment: "Bank Transfer",
+    status: "Delivered",
+    date: "Apr 08, 2026",
+  },
+  {
+    id: "ORD - 2026 - 314",
+    customer: "Yusuf Bello",
+    email: "yusuf.b@email.com",
+    initials: "YB",
+    items: 15,
+    amount: "₦521,000",
+    total: "₦521,000.00",
+    payment: "Card",
+    status: "Pending",
+    date: "Apr 08, 2026",
+  },
+  {
+    id: "ORD - 2026 - 313",
+    customer: "Adaeze Okonkwo",
+    email: "adaeze.o@email.com",
+    initials: "AO",
+    items: 9,
+    amount: "₦367,000",
+    total: "₦367,000.00",
+    payment: "Bank Transfer",
+    status: "In Transit",
+    date: "Apr 07, 2026",
+  },
+];
+
+export const ADMIN_ORDERS_TOTAL_COUNT = 17;
+
+export type AdminUserStatus = "ACTIVE" | "Suspended";
+
+export type AdminUser = {
+  id: string;
+  name: string;
+  email: string;
+  initials: string;
+  orders: number;
+  totalSpent: string;
+  joined: string;
+  joinedIso: string;
+  verified: boolean;
+  status: AdminUserStatus;
+};
+
+export const ADMIN_USERS: AdminUser[] = [
+  {
+    id: "u1",
+    name: "Emeka Okafor",
+    email: "emeka.o@email.com",
+    initials: "EO",
+    orders: 24,
+    totalSpent: "₦620,000",
+    joined: "Apr 16, 2026",
+    joinedIso: "2026-01-02",
+    verified: true,
+    status: "ACTIVE",
+  },
+  {
+    id: "u2",
+    name: "Chinedu Okoro",
+    email: "chinedu.o@email.com",
+    initials: "CO",
+    orders: 4,
+    totalSpent: "₦15,000",
+    joined: "Apr 14, 2026",
+    joinedIso: "2026-02-18",
+    verified: true,
+    status: "ACTIVE",
+  },
+  {
+    id: "u3",
+    name: "Amaka Nwosu",
+    email: "amaka.n@email.com",
+    initials: "AN",
+    orders: 3,
+    totalSpent: "₦42,500",
+    joined: "Apr 12, 2026",
+    joinedIso: "2026-03-01",
+    verified: false,
+    status: "Suspended",
+  },
+  {
+    id: "u4",
+    name: "Ibrahim Musa",
+    email: "ibrahim.m@email.com",
+    initials: "IM",
+    orders: 81,
+    totalSpent: "₦1,240,000",
+    joined: "Apr 10, 2026",
+    joinedIso: "2025-11-12",
+    verified: true,
+    status: "ACTIVE",
+  },
+  {
+    id: "u5",
+    name: "Fatima Aliyu",
+    email: "fatima.a@email.com",
+    initials: "FA",
+    orders: 12,
+    totalSpent: "₦186,000",
+    joined: "Apr 08, 2026",
+    joinedIso: "2026-01-20",
+    verified: true,
+    status: "ACTIVE",
+  },
+  {
+    id: "u6",
+    name: "Tunde Bakare",
+    email: "tunde.b@email.com",
+    initials: "TB",
+    orders: 7,
+    totalSpent: "₦98,000",
+    joined: "Apr 06, 2026",
+    joinedIso: "2026-02-05",
+    verified: false,
+    status: "Suspended",
+  },
+  {
+    id: "u7",
+    name: "Ngozi Eze",
+    email: "ngozi.e@email.com",
+    initials: "NE",
+    orders: 19,
+    totalSpent: "₦345,000",
+    joined: "Apr 04, 2026",
+    joinedIso: "2025-12-08",
+    verified: true,
+    status: "ACTIVE",
+  },
+  {
+    id: "u8",
+    name: "Yusuf Bello",
+    email: "yusuf.b@email.com",
+    initials: "YB",
+    orders: 2,
+    totalSpent: "₦28,000",
+    joined: "Apr 02, 2026",
+    joinedIso: "2026-03-15",
+    verified: true,
+    status: "ACTIVE",
+  },
+  {
+    id: "u9",
+    name: "Adaeze Okonkwo",
+    email: "adaeze.o@email.com",
+    initials: "AO",
+    orders: 15,
+    totalSpent: "₦412,000",
+    joined: "Mar 30, 2026",
+    joinedIso: "2025-10-22",
+    verified: false,
+    status: "Suspended",
+  },
+];
+
+export const ADMIN_USERS_TOTAL_COUNT = 74;
+
+export type AdminProcurementStatus =
+  | "Approved"
+  | "Under Review"
+  | "Pending"
+  | "Rejected";
+
+export type AdminProcurementRequest = {
+  id: string;
+  contact: string;
+  email: string;
+  items: string;
+  amount: string;
+  status: AdminProcurementStatus;
+  date: string;
+  submitted: string;
+  institution: string;
+  department: string;
+  contactName: string;
+  contactEmail: string;
+  contactPhone: string;
+  requestedItems: string;
+  purpose: string;
+};
+
+export const ADMIN_PROCUREMENT_REQUESTS: AdminProcurementRequest[] = [
+  {
+    id: "PRQ-001",
+    contact: "Emeka Okafor",
+    email: "emeka.o@techlab.com",
+    items: "Arduino Uno R3; ESV...",
+    amount: "₦2,235,000",
+    status: "Approved",
+    date: "Apr 11, 2026",
+    submitted: "Submitted Apr 01, 2026",
+    institution: "TechLab Institute",
+    department: "Embedded Systems",
+    contactName: "Emeka Okafor",
+    contactEmail: "emeka.o@techlab.com",
+    contactPhone: "+234 803 111 2233",
+    requestedItems:
+      "Arduino Uno R3 (50 units), ESP32 DevKit (30 units), DHT22 Sensor (40 units)",
+    purpose: "Undergraduate electronics lab restock",
+  },
+  {
+    id: "PRQ-002",
+    contact: "Chinedu Okoro",
+    email: "chinedu.o@edulab.ng",
+    items: "Raspberry Pi 4; Node...",
+    amount: "₦2,235,000",
+    status: "Under Review",
+    date: "Apr 11, 2026",
+    submitted: "Submitted Apr 02, 2026",
+    institution: "Covenant University",
+    department: "Computer Engineering",
+    contactName: "Prof. Aisha Bello",
+    contactEmail: "aisha.b@covenantuni.edu.ng",
+    contactPhone: "+234 805 234 5678",
+    requestedItems:
+      "Raspberry PI 4 (20 units), Camera Module V2 (20 units), MPU-6050 (40 units)",
+    purpose: "Robotics research lab setup",
+  },
+  {
+    id: "PRQ-003",
+    contact: "Amaka Nwosu",
+    email: "amaka.n@stemhub.com",
+    items: "DC Gear Motor 110RP...",
+    amount: "₦2,235,000",
+    status: "Pending",
+    date: "Apr 10, 2026",
+    submitted: "Submitted Apr 03, 2026",
+    institution: "STEM Hub Academy",
+    department: "Mechatronics",
+    contactName: "Amaka Nwosu",
+    contactEmail: "amaka.n@stemhub.com",
+    contactPhone: "+234 809 444 1122",
+    requestedItems:
+      "DC Gear Motor 110RPM (60 units), Motor Driver Shield (30 units)",
+    purpose: "Secondary school robotics workshop",
+  },
+  {
+    id: "PRQ-004",
+    contact: "Ibrahim Musa",
+    email: "ibrahim.m@makerlab.ng",
+    items: "ESP32 DevKit; DHT22...",
+    amount: "₦2,235,000",
+    status: "Rejected",
+    date: "Apr 10, 2026",
+    submitted: "Submitted Mar 28, 2026",
+    institution: "Maker Lab NG",
+    department: "IoT Projects",
+    contactName: "Ibrahim Musa",
+    contactEmail: "ibrahim.m@makerlab.ng",
+    contactPhone: "+234 701 555 8899",
+    requestedItems:
+      "ESP32 DevKit (100 units), DHT22 Sensor (80 units), Breadboard (50 units)",
+    purpose: "Community maker space kit expansion",
+  },
+  {
+    id: "PRQ-005",
+    contact: "Fatima Aliyu",
+    email: "fatima.a@techschool.edu",
+    items: "L298N Motor Module;...",
+    amount: "₦2,235,000",
+    status: "Approved",
+    date: "Apr 09, 2026",
+    submitted: "Submitted Mar 30, 2026",
+    institution: "Federal Tech School",
+    department: "Electrical Engineering",
+    contactName: "Fatima Aliyu",
+    contactEmail: "fatima.a@techschool.edu",
+    contactPhone: "+234 802 333 6677",
+    requestedItems:
+      "L298N Motor Module (40 units), Jumper Wire Kit (25 packs)",
+    purpose: "Practical motor control classes",
+  },
+  {
+    id: "PRQ-006",
+    contact: "Tunde Bakare",
+    email: "tunde.b@robotics.ng",
+    items: "NEMA 17 Stepper; Dr...",
+    amount: "₦2,235,000",
+    status: "Under Review",
+    date: "Apr 09, 2026",
+    submitted: "Submitted Apr 04, 2026",
+    institution: "Robotics NG",
+    department: "Automation",
+    contactName: "Tunde Bakare",
+    contactEmail: "tunde.b@robotics.ng",
+    contactPhone: "+234 813 222 4455",
+    requestedItems:
+      "NEMA 17 Stepper (35 units), Driver Board (35 units), Couplers (70 units)",
+    purpose: "CNC prototype training kits",
+  },
+  {
+    id: "PRQ-007",
+    contact: "Ngozi Eze",
+    email: "ngozi.e@iotlab.com",
+    items: "OLED 128×64; Bread...",
+    amount: "₦2,235,000",
+    status: "Pending",
+    date: "Apr 08, 2026",
+    submitted: "Submitted Apr 05, 2026",
+    institution: "IoT Lab Africa",
+    department: "Hardware Design",
+    contactName: "Ngozi Eze",
+    contactEmail: "ngozi.e@iotlab.com",
+    contactPhone: "+234 706 998 1100",
+    requestedItems:
+      "OLED 128×64 Display (45 units), Breadboard (45 units), Resistor Kit (20 packs)",
+    purpose: "Display interface prototyping course",
+  },
+  {
+    id: "PRQ-008",
+    contact: "Yusuf Bello",
+    email: "yusuf.b@engdept.edu",
+    items: "12V 5A Power Supply...",
+    amount: "₦2,235,000",
+    status: "Approved",
+    date: "Apr 08, 2026",
+    submitted: "Submitted Mar 25, 2026",
+    institution: "State Engineering Dept",
+    department: "Power Systems",
+    contactName: "Yusuf Bello",
+    contactEmail: "yusuf.b@engdept.edu",
+    contactPhone: "+234 807 654 3210",
+    requestedItems:
+      "12V 5A Power Supply (25 units), Terminal Blocks (100 units)",
+    purpose: "Lab bench power upgrade",
+  },
+];
+
+export const ADMIN_PROCUREMENT_AWAITING_REVIEW = 2;
