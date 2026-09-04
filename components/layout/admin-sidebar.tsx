@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { AdminFooterCard } from "@/components/layout/admin-footer-card";
 import { NavIcon } from "@/components/layout/nav-icons";
 import { useSidebar } from "@/components/layout/sidebar-context";
+import { SignOutButton } from "@/components/auth/sign-out-button";
 import { Can, usePermission } from "@/lib/permissions";
 import { ADMIN_NAV } from "@/lib/admin";
 import { cn } from "@/lib/utils";
@@ -142,14 +143,13 @@ export function AdminSidebar() {
 
       <div className={cn("mt-auto pt-4", collapsed && "flex justify-center")}>
         {collapsed ? (
-          <Link
-            href="/auth/signin"
+          <SignOutButton
             title={`${roleName} — Sign out`}
             className="inline-flex size-11 items-center justify-center rounded-xl bg-[#f3ffc7] text-sm font-bold text-aurora-ink"
             aria-label="Sign out"
           >
             SA
-          </Link>
+          </SignOutButton>
         ) : (
           <AdminFooterCard roleName={roleName} email={email} />
         )}

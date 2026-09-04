@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { AuroraLogo } from "@/components/auth/aurora-logo";
 import {
   AuthButton,
@@ -10,16 +10,20 @@ import {
   Field,
   TextInput,
 } from "@/components/auth/form-controls";
+import { BffRequestError, loginRequest } from "@/lib/bff/client";
 
-export default function SignInPage() {
+function SignInForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
 
-  const onSubmit = (e: React.FormEvent) => {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const next: Record<string, string> = {};
     if (!email.trim()) next.email = "Email is required";
@@ -27,8 +31,33 @@ export default function SignInPage() {
       next.email = "Enter a valid email";
     if (!password) next.password = "Password is required";
     setErrors(next);
+    setFormError(null);
     if (Object.keys(next).length > 0) return;
-    router.push("/dashboard");
+
+    setPending(true);
+    try {
+      const result = await loginRequest({
+        email: email.trim(),
+        password,
+        rememberMe,
+      });
+      const nextPath = searchParams.get("next");
+      const target =
+        nextPath && nextPath.startsWith("/") && !nextPath.startsWith("//")
+          ? nextPath
+          : result.redirectTo;
+      router.replace(target);
+      router.refresh();
+    } catch (error) {
+      if (error instanceof BffRequestError) {
+        if (error.fieldErrors) setErrors(error.fieldErrors);
+        setFormError(error.message);
+      } else {
+        setFormError("Unable to sign in. Try again.");
+      }
+    } finally {
+      setPending(false);
+    }
   };
 
   return (
@@ -120,10 +149,21 @@ export default function SignInPage() {
                 />
                 Remember me for 30 days
               </label>
+
+              {formError ? (
+                <p className="text-sm text-red-600" role="alert">
+                  {formError}
+                </p>
+              ) : null}
             </div>
 
-            <AuthButton type="submit" variant="lime" className="mt-24 w-full">
-              Sign In
+            <AuthButton
+              type="submit"
+              variant="lime"
+              className="mt-24 w-full"
+              disabled={pending}
+            >
+              {pending ? "Signing in…" : "Sign In"}
             </AuthButton>
 
             <p className="mt-5 text-center text-sm text-[#8a8a8a]">
@@ -135,9 +175,29 @@ export default function SignInPage() {
                 Create one free
               </Link>
             </p>
+
+            <p className="mt-4 text-center text-xs leading-relaxed text-[#8a8a8a]">
+              Mock auth: any password (4+ chars). Use an email with{" "}
+              <span className="font-medium text-aurora-ink">admin</span> for the
+              admin app.
+            </p>
           </form>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-full items-center justify-center text-sm text-[#8a8a8a]">
+          Loading…
+        </div>
+      }
+    >
+      <SignInForm />
+    </Suspense>
   );
 }
