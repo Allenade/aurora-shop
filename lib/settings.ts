@@ -104,6 +104,7 @@ export type BillingInvoice = {
   id: string;
   date: string;
   amount: string;
+  status?: string;
 };
 
 export const DEFAULT_PAYMENT_METHODS: PaymentMethod[] = [

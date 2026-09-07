@@ -2,7 +2,8 @@ export type QuoteStatus =
   | "Approved"
   | "Pending"
   | "Under Review"
-  | "Draft";
+  | "Draft"
+  | "Rejected";
 
 export type QuoteFormFields = {
   companyName: string;

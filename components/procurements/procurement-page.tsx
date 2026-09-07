@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NeedAssistanceCard } from "@/components/procurements/need-assistance";
 import {
   QuoteRequestForm,
@@ -11,20 +11,32 @@ import {
   type SubmittedQuote,
 } from "@/components/procurements/quote-submitted";
 import { RecentQuotes } from "@/components/procurements/recent-quotes";
+import { bffCall } from "@/lib/bff/generated/client";
 import {
   createDraftQuote,
   createQuoteReferenceId,
-  RECENT_QUOTES,
   type RecentQuote,
 } from "@/lib/procurements";
 
 export function ProcurementPage() {
-  const [quotes, setQuotes] = useState<RecentQuote[]>(RECENT_QUOTES);
+  const [quotes, setQuotes] = useState<RecentQuote[]>([]);
   const [editingQuote, setEditingQuote] = useState<RecentQuote | null>(null);
   const [submittedQuote, setSubmittedQuote] = useState<SubmittedQuote | null>(
     null,
   );
   const [formKey, setFormKey] = useState(0);
+
+  function refreshQuotes() {
+    void bffCall<RecentQuote[]>("listQuotes")
+      .then((rows) => {
+        if (Array.isArray(rows)) setQuotes(rows);
+      })
+      .catch(() => undefined);
+  }
+
+  useEffect(() => {
+    refreshQuotes();
+  }, []);
 
   function handleSubmitted(
     form: QuoteFormState,
@@ -35,15 +47,21 @@ export function ProcurementPage() {
         ? currentEditing.id
         : createQuoteReferenceId();
 
-    if (currentEditing?.status === "Draft") {
-      setQuotes((prev) => prev.filter((q) => q.id !== currentEditing.id));
-    }
-
     setEditingQuote(null);
     setSubmittedQuote({
       ...form,
       referenceNumber,
     });
+    void bffCall<RecentQuote>("createQuote", {
+      body: { ...form, submit: true },
+    })
+      .then((created) => {
+        if (created?.id) {
+          setSubmittedQuote({ ...form, referenceNumber: created.id });
+        }
+        refreshQuotes();
+      })
+      .catch(() => undefined);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -60,6 +78,9 @@ export function ProcurementPage() {
       const withoutCurrent = prev.filter((q) => q.id !== draft.id);
       return [draft, ...withoutCurrent];
     });
+    void bffCall("createQuote", { body: { ...form, submit: false } })
+      .then(() => refreshQuotes())
+      .catch(() => undefined);
     setEditingQuote(null);
   }
 

@@ -498,6 +498,7 @@ export type AdminOrderPayment = "Bank Transfer" | "Card";
 
 export type AdminOrder = {
   id: string;
+  internalId?: string;
   customer: string;
   email: string;
   initials: string;
@@ -806,6 +807,7 @@ export type AdminProcurementStatus =
 
 export type AdminProcurementRequest = {
   id: string;
+  internalId?: string;
   contact: string;
   email: string;
   items: string;

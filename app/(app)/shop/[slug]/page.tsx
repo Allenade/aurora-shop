@@ -1,7 +1,4 @@
-import { notFound } from "next/navigation";
-import { ProductDetail } from "@/components/shop/product-detail";
-import { ShopProductGate } from "@/components/shop/shop-product-gate";
-import { getProductBySlug } from "@/lib/shop";
+import { ProductDetailLoader } from "@/components/shop/product-detail-loader";
 
 export default async function ShopProductPage({
   params,
@@ -9,12 +6,5 @@ export default async function ShopProductPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const product = getProductBySlug(slug);
-  if (!product) notFound();
-
-  return (
-    <ShopProductGate>
-      <ProductDetail product={product} />
-    </ShopProductGate>
-  );
+  return <ProductDetailLoader slug={slug} />;
 }

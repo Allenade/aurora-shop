@@ -1,14 +1,15 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AdminOrderDetailDrawer } from '@/components/admin/admin-order-detail-drawer';
 import { Badge } from '@/components/ui/badge';
 import {
-  ADMIN_ORDERS,
-  ADMIN_ORDERS_TOTAL_COUNT,
   type AdminOrder,
   type AdminOrderStatus,
 } from '@/lib/admin';
+import { bffCall } from '@/lib/bff/generated/client';
+import { fulfillmentStatus, toAdminOrder } from '@/lib/bff/map';
+import type { OrderRecord } from '@/lib/orders';
 import { cn } from '@/lib/utils';
 
 const FILTERS = ['All Orders', 'Delivered', 'In Transit', 'Pending'] as const;
@@ -113,10 +114,18 @@ function OrderRow({ order, onOpen }: { order: AdminOrder; onOpen: (order: AdminO
 }
 
 export function AdminOrders() {
-  const [orders, setOrders] = useState(ADMIN_ORDERS);
+  const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('All Orders');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    void bffCall<OrderRecord[]>('listOrders')
+      .then((rows) => {
+        if (Array.isArray(rows)) setOrders(rows.map((row) => toAdminOrder(row)));
+      })
+      .catch(() => undefined);
+  }, []);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -138,9 +147,23 @@ export function AdminOrders() {
 
   function handleStatusChange(status: AdminOrderStatus) {
     if (!selectedId) return;
-    setOrders((prev) =>
-      prev.map((order) => (order.id === selectedId ? { ...order, status } : order)),
-    );
+    const current = orders.find((order) => order.id === selectedId);
+    if (!current?.internalId) {
+      setOrders((prev) =>
+        prev.map((order) => (order.id === selectedId ? { ...order, status } : order)),
+      );
+      return;
+    }
+    void bffCall('setOrderStatus', {
+      params: { id: current.internalId },
+      body: { status: fulfillmentStatus(status) },
+    })
+      .then(() => {
+        setOrders((prev) =>
+          prev.map((order) => (order.id === selectedId ? { ...order, status } : order)),
+        );
+      })
+      .catch(() => undefined);
   }
 
   return (
@@ -149,7 +172,7 @@ export function AdminOrders() {
         <h1 className="text-[1.75rem] font-bold tracking-tight text-aurora-ink">
           Orders Management
         </h1>
-        <p className="mt-1 text-sm text-[#8a8a8a]">{ADMIN_ORDERS_TOTAL_COUNT} Orders</p>
+        <p className="mt-1 text-sm text-[#8a8a8a]">{orders.length} Orders</p>
       </div>
 
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -232,7 +255,7 @@ export function AdminOrders() {
 
         <div className="flex flex-col gap-3 border-t border-[#ececec] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <p className="text-sm text-[#8a8a8a]">
-            Showing 1-{filtered.length} of {ADMIN_ORDERS_TOTAL_COUNT} orders
+            Showing 1-{filtered.length} of {orders.length} orders
           </p>
           <div className="flex flex-wrap items-center gap-1.5">
             <button

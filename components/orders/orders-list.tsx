@@ -1,19 +1,34 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { OrderRow } from "@/components/orders/order-row";
 import { OrdersFilterTabs } from "@/components/orders/orders-filter-tabs";
+import { bffCall } from "@/lib/bff/generated/client";
 import {
   ORDERS,
   filterOrders,
   getOrderCounts,
   type OrderFilter,
+  type OrderRecord,
 } from "@/lib/orders";
 
 export function OrdersList() {
   const [filter, setFilter] = useState<OrderFilter>("all");
-  const counts = useMemo(() => getOrderCounts(ORDERS), []);
-  const orders = useMemo(() => filterOrders(ORDERS, filter), [filter]);
+  const [records, setRecords] = useState<OrderRecord[]>(ORDERS);
+
+  useEffect(() => {
+    void bffCall<OrderRecord[]>("listOrders")
+      .then((rows) => {
+        if (Array.isArray(rows)) setRecords(rows);
+      })
+      .catch(() => undefined);
+  }, []);
+
+  const counts = useMemo(() => getOrderCounts(records), [records]);
+  const orders = useMemo(
+    () => filterOrders(records, filter),
+    [records, filter],
+  );
 
   return (
     <div className="mx-auto w-full max-w-6xl">

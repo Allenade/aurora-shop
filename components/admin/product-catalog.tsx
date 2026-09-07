@@ -1,15 +1,16 @@
 'use client';
 
 import Image from 'next/image';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { EditProductModal } from '@/components/admin/edit-product-modal';
 import { RemoveProductModal } from '@/components/admin/remove-product-modal';
 import {
-  CATALOG_PRODUCTS,
-  CATALOG_TOTAL_COUNT,
   type CatalogProduct,
   type CatalogStatus,
 } from '@/lib/admin';
+import { bffCall } from '@/lib/bff/generated/client';
+import { toCatalogProduct } from '@/lib/bff/map';
+import type { ShopProduct } from '@/lib/shop';
 import { cn } from '@/lib/utils';
 
 function statusClasses(status: CatalogStatus) {
@@ -149,12 +150,20 @@ function ProductRow({
 const FILTERS = ['All Products', 'In Stock', 'Low Stock', 'Critical', 'Out of Stock'] as const;
 
 export function ProductCatalog() {
-  const [products, setProducts] = useState(CATALOG_PRODUCTS);
+  const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('All Products');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
+
+  useEffect(() => {
+    void bffCall<Array<ShopProduct & { sku?: string; minStock?: number }>>('listProducts')
+      .then((rows) => {
+        if (Array.isArray(rows)) setProducts(rows.map((row) => toCatalogProduct(row)));
+      })
+      .catch(() => undefined);
+  }, []);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -183,20 +192,57 @@ export function ProductCatalog() {
     removingId === null ? null : (products.find((product) => product.id === removingId) ?? null);
 
   function handleDelete(id: string) {
-    setProducts((prev) => prev.filter((p) => p.id !== id));
-    setRemovingId(null);
+    void bffCall('deleteProduct', { params: { id } })
+      .then(() => {
+        setProducts((prev) => prev.filter((p) => p.id !== id));
+        setRemovingId(null);
+      })
+      .catch(() => undefined);
   }
 
   function handleSave(next: CatalogProduct) {
-    setProducts((prev) => {
-      const exists = prev.some((product) => product.id === next.id);
-      if (exists) {
-        return prev.map((product) => (product.id === next.id ? next : product));
-      }
-      return [next, ...prev];
-    });
-    setEditingId(null);
-    setIsAdding(false);
+    const price = Number(next.priceLabel.replace(/[^\d]/g, '')) || 0;
+    const slug = next.sku
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+    const payload = {
+      name: next.name,
+      subtitle: next.description,
+      sku: next.sku,
+      category: next.category,
+      brand: next.category,
+      price,
+      quantity: next.stock,
+      minStock: next.minStock,
+      slug: slug || `product-${Date.now()}`,
+      image: next.image || '/images/auth-panel.png',
+      images: [next.image || '/images/auth-panel.png'],
+    };
+    const exists = products.some((product) => product.id === next.id);
+    const request = exists
+      ? bffCall<ShopProduct & { sku?: string; minStock?: number }>('updateProduct', {
+          params: { id: next.id },
+          body: payload,
+        })
+      : bffCall<ShopProduct & { sku?: string; minStock?: number }>('createProduct', {
+          body: payload,
+        });
+
+    void request
+      .then((saved) => {
+        const mapped = toCatalogProduct(saved);
+        setProducts((prev) => {
+          const found = prev.some((product) => product.id === mapped.id);
+          if (found) {
+            return prev.map((product) => (product.id === mapped.id ? mapped : product));
+          }
+          return [mapped, ...prev];
+        });
+        setEditingId(null);
+        setIsAdding(false);
+      })
+      .catch(() => undefined);
   }
 
   return (
@@ -206,7 +252,7 @@ export function ProductCatalog() {
           <h1 className="text-[1.75rem] font-bold tracking-tight text-aurora-ink">
             Product Catalog
           </h1>
-          <p className="mt-1 text-sm text-[#8a8a8a]">{CATALOG_TOTAL_COUNT} Products in Catalog</p>
+          <p className="mt-1 text-sm text-[#8a8a8a]">{products.length} Products in Catalog</p>
         </div>
 
         <button
@@ -301,7 +347,7 @@ export function ProductCatalog() {
 
         <div className="flex flex-col gap-3 border-t border-[#ececec] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <p className="text-sm text-[#8a8a8a]">
-            Showing 1-{filtered.length} of {CATALOG_TOTAL_COUNT} products
+            Showing 1-{filtered.length} of {products.length} products
           </p>
           <div className="flex flex-wrap items-center gap-1.5">
             <button

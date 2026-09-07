@@ -24,6 +24,7 @@ import {
   type SignupStep1,
   type SignupStep2,
 } from "@/lib/auth";
+import { BffRequestError, registerRequest } from "@/lib/bff/client";
 
 const emptyStep1: SignupStep1 = {
   firstName: "",
@@ -86,10 +87,23 @@ export default function SignUpPage() {
     setStep(2);
   };
 
-  const onCreate = (e: React.FormEvent) => {
+  const onCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateStep2()) return;
-    router.push(`/auth/verify?email=${encodeURIComponent(step1.email.trim())}`);
+    try {
+      await registerRequest({
+        ...step1,
+        ...step2,
+        email: step1.email.trim(),
+      });
+      router.push(`/auth/verify?email=${encodeURIComponent(step1.email.trim())}`);
+    } catch (error) {
+      const message =
+        error instanceof BffRequestError
+          ? error.message
+          : "Unable to create account";
+      setErrors({ email: message });
+    }
   };
 
   return (

@@ -1,15 +1,15 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AdminUserDetailDrawer } from '@/components/admin/admin-user-detail-drawer';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import {
-  ADMIN_USERS,
-  ADMIN_USERS_TOTAL_COUNT,
   type AdminUser,
   type AdminUserStatus,
 } from '@/lib/admin';
+import { bffCall } from '@/lib/bff/generated/client';
+import { toAdminUser } from '@/lib/bff/map';
 import { cn } from '@/lib/utils';
 
 const FILTERS = ['All Users', 'Active', 'Suspended'] as const;
@@ -97,10 +97,18 @@ function UserRow({ user, onOpen }: { user: AdminUser; onOpen: (user: AdminUser) 
 }
 
 export function AdminUsers() {
-  const [users, setUsers] = useState(ADMIN_USERS);
+  const [users, setUsers] = useState<AdminUser[]>([]);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('All Users');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    void bffCall<Array<Parameters<typeof toAdminUser>[0]>>('listUsers')
+      .then((rows) => {
+        if (Array.isArray(rows)) setUsers(rows.map((row) => toAdminUser(row)));
+      })
+      .catch(() => undefined);
+  }, []);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -122,7 +130,16 @@ export function AdminUsers() {
 
   function handleStatusChange(status: AdminUserStatus) {
     if (!selectedId) return;
-    setUsers((prev) => prev.map((user) => (user.id === selectedId ? { ...user, status } : user)));
+    void bffCall('setUserStatus', {
+      params: { id: selectedId },
+      body: { status: status === 'ACTIVE' ? 'active' : 'suspended' },
+    })
+      .then(() => {
+        setUsers((prev) =>
+          prev.map((user) => (user.id === selectedId ? { ...user, status } : user)),
+        );
+      })
+      .catch(() => undefined);
   }
 
   return (
@@ -131,7 +148,7 @@ export function AdminUsers() {
         <h1 className="text-[1.75rem] font-bold tracking-tight text-aurora-ink">
           Users Management
         </h1>
-        <p className="mt-1 text-sm text-[#8a8a8a]">{ADMIN_USERS_TOTAL_COUNT} Registered users</p>
+        <p className="mt-1 text-sm text-[#8a8a8a]">{users.length} Registered users</p>
       </div>
 
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -201,7 +218,7 @@ export function AdminUsers() {
 
         <div className="flex flex-col gap-3 border-t border-[#ececec] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <p className="text-sm text-[#8a8a8a]">
-            Showing 1-{filtered.length} of {ADMIN_USERS_TOTAL_COUNT} users
+            Showing 1-{filtered.length} of {users.length} users
           </p>
           <div className="flex flex-wrap items-center gap-1.5">
             <button

@@ -10,6 +10,7 @@ import {
   sessionFieldsFromUser,
   upstreamCurrentUser,
   upstreamLoginUser,
+  upstreamLogout,
 } from "@/lib/bff/upstream";
 import type { LoginInput } from "@/lib/bff/config";
 import type { SessionUser } from "@/lib/permissions/permissions.types";
@@ -17,12 +18,20 @@ import type { SessionUser } from "@/lib/permissions/permissions.types";
 export async function loginWithPassword(input: LoginInput) {
   const result = await upstreamLoginUser(input);
   const maxAge = sessionMaxAge(input.rememberMe);
-  const token = sealSession(sessionFieldsFromUser(result.user), maxAge);
+  const token = sealSession(
+    sessionFieldsFromUser(result.user, {
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+    }),
+    maxAge,
+  );
   await writeSessionCookie(token, maxAge);
   return result;
 }
 
 export async function logoutSession() {
+  const session = await readSessionCookie();
+  await upstreamLogout(session);
   await clearSessionCookie();
 }
 

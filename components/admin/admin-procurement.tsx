@@ -1,13 +1,15 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AdminProcurementDetailDrawer } from '@/components/admin/admin-procurement-detail-drawer';
 import { Badge } from '@/components/ui/badge';
 import {
-  ADMIN_PROCUREMENT_REQUESTS,
   type AdminProcurementRequest,
   type AdminProcurementStatus,
 } from '@/lib/admin';
+import { bffCall } from '@/lib/bff/generated/client';
+import { quoteApiStatus, toAdminProcurement } from '@/lib/bff/map';
+import type { RecentQuote } from '@/lib/procurements';
 
 const FILTERS = ['All Requests', 'Approved', 'Under Review', 'Pending', 'Rejected'] as const;
 
@@ -104,10 +106,18 @@ function RequestRow({
 }
 
 export function AdminProcurement() {
-  const [requests, setRequests] = useState(ADMIN_PROCUREMENT_REQUESTS);
+  const [requests, setRequests] = useState<AdminProcurementRequest[]>([]);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('All Requests');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    void bffCall<Array<RecentQuote & { internalId?: string }>>('listQuotes')
+      .then((rows) => {
+        if (Array.isArray(rows)) setRequests(rows.map((row) => toAdminProcurement(row)));
+      })
+      .catch(() => undefined);
+  }, []);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -134,9 +144,23 @@ export function AdminProcurement() {
   ).length;
 
   function updateStatus(id: string, status: AdminProcurementStatus) {
-    setRequests((prev) =>
-      prev.map((request) => (request.id === id ? { ...request, status } : request)),
-    );
+    const current = requests.find((request) => request.id === id);
+    if (!current?.internalId) {
+      setRequests((prev) =>
+        prev.map((request) => (request.id === id ? { ...request, status } : request)),
+      );
+      return;
+    }
+    void bffCall('setQuoteStatus', {
+      params: { id: current.internalId },
+      body: { status: quoteApiStatus(status) },
+    })
+      .then(() => {
+        setRequests((prev) =>
+          prev.map((request) => (request.id === id ? { ...request, status } : request)),
+        );
+      })
+      .catch(() => undefined);
   }
 
   return (

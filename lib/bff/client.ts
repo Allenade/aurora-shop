@@ -77,3 +77,28 @@ export function logoutRequest() {
 export function meRequest() {
   return bffFetch<{ user: SessionUser }>("/api/auth/me");
 }
+
+export function registerRequest(input: Record<string, unknown>) {
+  return bffFetch<{ ok: true; email: string }>("/api/auth/register", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function verifyOtpRequest(email: string, code: string) {
+  return bffFetch<LoginResponse>("/api/auth/verify", {
+    method: "POST",
+    body: JSON.stringify({ email, code }),
+  });
+}
+
+export function apiGet<T>(path: string) {
+  return bffFetch<T>(`/api/bff${path}`);
+}
+
+export function apiSend<T>(path: string, method: string, body?: unknown) {
+  return bffFetch<T>(`/api/bff${path}`, {
+    method,
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+}

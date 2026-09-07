@@ -1,16 +1,16 @@
 'use client';
 
 import Image from 'next/image';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { RestockItemModal } from '@/components/admin/restock-item-modal';
 import {
   formatInventoryRestockDate,
-  INVENTORY_ITEMS,
-  INVENTORY_TOTAL_COUNT,
   resolveInventoryStatus,
   type CatalogStatus,
   type InventoryItem,
 } from '@/lib/admin';
+import { bffCall } from '@/lib/bff/generated/client';
+import { toInventoryItem } from '@/lib/bff/map';
 import { cn } from '@/lib/utils';
 
 const FILTERS = ['All Status', 'Critical', 'Out of Stock', 'In Stock', 'Low Stock'] as const;
@@ -106,10 +106,18 @@ function InventoryRow({
 }
 
 export function AdminInventory() {
-  const [items, setItems] = useState(INVENTORY_ITEMS);
+  const [items, setItems] = useState<InventoryItem[]>([]);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('All Status');
   const [restockingId, setRestockingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    void bffCall<Array<Parameters<typeof toInventoryItem>[0]>>('listInventory')
+      .then((rows) => {
+        if (Array.isArray(rows)) setItems(rows.map((row) => toInventoryItem(row)));
+      })
+      .catch(() => undefined);
+  }, []);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -137,19 +145,26 @@ export function AdminInventory() {
   function handleRestock(quantity: number) {
     if (!restockingId) return;
 
-    setItems((prev) =>
-      prev.map((item) => {
-        if (item.id !== restockingId) return item;
-        const stock = Math.min(item.capacity, item.stock + quantity);
-        return {
-          ...item,
-          stock,
-          lastRestocked: formatInventoryRestockDate(),
-          status: resolveInventoryStatus(stock, item.capacity),
-        };
-      }),
-    );
-    setRestockingId(null);
+    void bffCall<{ ok: true; quantity: number }>('restockInventory', {
+      params: { productId: restockingId },
+      body: { quantity },
+    })
+      .then((result) => {
+        setItems((prev) =>
+          prev.map((item) => {
+            if (item.id !== restockingId) return item;
+            const stock = result.quantity ?? Math.min(item.capacity, item.stock + quantity);
+            return {
+              ...item,
+              stock,
+              lastRestocked: formatInventoryRestockDate(),
+              status: resolveInventoryStatus(stock, item.capacity),
+            };
+          }),
+        );
+        setRestockingId(null);
+      })
+      .catch(() => undefined);
   }
 
   return (
@@ -234,7 +249,7 @@ export function AdminInventory() {
 
         <div className="flex flex-col gap-3 border-t border-[#ececec] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <p className="text-sm text-[#8a8a8a]">
-            Showing 1-{filtered.length} of {INVENTORY_TOTAL_COUNT} products
+            Showing 1-{filtered.length} of {items.length} products
           </p>
           <div className="flex flex-wrap items-center gap-1.5">
             <button

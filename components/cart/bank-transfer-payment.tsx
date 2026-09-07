@@ -6,10 +6,17 @@ import {
   formatCartMoneyCompact,
 } from "@/lib/cart";
 
+type BankDetails = {
+  bank: string;
+  accountName: string;
+  accountNumber: string;
+};
+
 type BankTransferPaymentProps = {
   amount: number;
   transferReference: string;
   payerName: string;
+  bank?: BankDetails | null;
 };
 
 function BankBuildingIcon() {
@@ -43,8 +50,14 @@ export function BankTransferPayment({
   amount,
   transferReference,
   payerName,
+  bank,
 }: BankTransferPaymentProps) {
   const displayName = payerName.trim() || "the account holder";
+  const details = {
+    bank: bank?.bank ?? BANK_TRANSFER_DETAILS.bank,
+    accountName: bank?.accountName ?? BANK_TRANSFER_DETAILS.accountName,
+    accountNumber: bank?.accountNumber ?? BANK_TRANSFER_DETAILS.accountNumber,
+  };
 
   return (
     <div className="rounded-2xl border border-[#e5e5e5] bg-white p-5 sm:p-6">
@@ -80,10 +93,10 @@ export function BankTransferPayment({
                 {row.label}
               </p>
               <p className="mt-1 text-sm font-semibold text-aurora-ink">
-                {BANK_TRANSFER_DETAILS[row.valueKey]}
+                {details[row.valueKey]}
               </p>
             </div>
-            <CopyValueButton value={BANK_TRANSFER_DETAILS[row.valueKey]} />
+            <CopyValueButton value={details[row.valueKey]} />
           </div>
         ))}
 

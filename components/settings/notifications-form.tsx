@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { bffCall } from "@/lib/bff/generated/client";
 import {
   DEFAULT_NOTIFICATION_PREFERENCES,
   type NotificationPreferenceId,
@@ -41,10 +42,28 @@ function Toggle({
 export function NotificationsForm() {
   const [prefs, setPrefs] = useState(DEFAULT_NOTIFICATION_PREFERENCES);
 
+  useEffect(() => {
+    void bffCall<Record<string, boolean>>("getNotificationSettings")
+      .then((flags) => {
+        setPrefs((prev) =>
+          prev.map((item) => ({
+            ...item,
+            enabled: flags[item.id] ?? item.enabled,
+          })),
+        );
+      })
+      .catch(() => undefined);
+  }, []);
+
   function toggle(id: NotificationPreferenceId, enabled: boolean) {
-    setPrefs((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, enabled } : item)),
-    );
+    setPrefs((prev) => {
+      const next = prev.map((item) =>
+        item.id === id ? { ...item, enabled } : item,
+      );
+      const body = Object.fromEntries(next.map((item) => [item.id, item.enabled]));
+      void bffCall("updateNotificationSettings", { body }).catch(() => undefined);
+      return next;
+    });
   }
 
   return (

@@ -1,7 +1,4 @@
-import { notFound } from "next/navigation";
-import { OrderDetail } from "@/components/orders/order-detail";
-import { OrderDetailGate } from "@/components/orders/order-detail-gate";
-import { getOrderById } from "@/lib/orders";
+import { OrderDetailLoader } from "@/components/orders/order-detail-loader";
 
 export default async function OrderDetailPage({
   params,
@@ -9,12 +6,5 @@ export default async function OrderDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const order = getOrderById(decodeURIComponent(id));
-  if (!order) notFound();
-
-  return (
-    <OrderDetailGate>
-      <OrderDetail order={order} />
-    </OrderDetailGate>
-  );
+  return <OrderDetailLoader id={decodeURIComponent(id)} />;
 }
