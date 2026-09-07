@@ -1,23 +1,23 @@
-"use client";
+'use client';
 
-import Image from "next/image";
-import { useMemo, useState } from "react";
+import Image from 'next/image';
+import { useEffect, useMemo, useState } from 'react';
+import { EditProductModal } from '@/components/admin/edit-product-modal';
+import { RemoveProductModal } from '@/components/admin/remove-product-modal';
 import {
-  CATALOG_PRODUCTS,
-  CATALOG_TOTAL_COUNT,
   type CatalogProduct,
   type CatalogStatus,
-} from "@/lib/admin";
-import { cn } from "@/lib/utils";
+} from '@/lib/admin';
+import { bffCall } from '@/lib/bff/generated/client';
+import { toCatalogProduct } from '@/lib/bff/map';
+import type { ShopProduct } from '@/lib/shop';
+import { cn } from '@/lib/utils';
 
 function statusClasses(status: CatalogStatus) {
-  if (status === "CRITICAL")
-    return "border-[#f0b4b4] text-[#d64545] bg-[#fff5f5]";
-  if (status === "OUT OF STOCK")
-    return "border-[#d4d4d4] text-[#6b7280] bg-[#f7f7f7]";
-  if (status === "IN STOCK")
-    return "border-[#a8dfc0] text-[#1f9d57] bg-[#f0faf4]";
-  return "border-[#f0c49a] text-[#e67a2e] bg-[#fff7ef]";
+  if (status === 'CRITICAL') return 'border-[#f0b4b4] text-[#d64545] bg-[#fff5f5]';
+  if (status === 'OUT OF STOCK') return 'border-[#d4d4d4] text-[#6b7280] bg-[#f7f7f7]';
+  if (status === 'IN STOCK') return 'border-[#a8dfc0] text-[#1f9d57] bg-[#f0faf4]';
+  return 'border-[#f0c49a] text-[#e67a2e] bg-[#fff7ef]';
 }
 
 function EditIcon() {
@@ -29,12 +29,7 @@ function EditIcon() {
         strokeWidth="1.6"
         strokeLinejoin="round"
       />
-      <path
-        d="M13.5 5.5 17.5 9.5"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
+      <path d="M13.5 5.5 17.5 9.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
     </svg>
   );
 }
@@ -57,7 +52,7 @@ function StatusBadge({ status }: { status: CatalogStatus }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-semibold tracking-wide whitespace-nowrap uppercase",
+        'inline-flex items-center rounded-md border px-2 py-0.5 text-[10px] font-semibold tracking-wide whitespace-nowrap uppercase',
         statusClasses(status),
       )}
     >
@@ -72,25 +67,22 @@ function stockFillPercent(product: CatalogProduct) {
 }
 
 function stockBarTone(status: CatalogStatus) {
-  if (status === "CRITICAL") return "bg-[#d64545]";
-  if (status === "LOW STOCK") return "bg-[#e67a2e]";
-  if (status === "IN STOCK") return "bg-[#22c55e]";
-  return "bg-transparent";
+  if (status === 'CRITICAL') return 'bg-[#d64545]';
+  if (status === 'LOW STOCK') return 'bg-[#e67a2e]';
+  if (status === 'IN STOCK') return 'bg-[#22c55e]';
+  return 'bg-transparent';
 }
 
 function StockCell({ product }: { product: CatalogProduct }) {
   return (
-    <div className="min-w-[88px]">
+    <div className="min-w-22">
       <p className="text-sm font-semibold whitespace-nowrap text-aurora-ink">
         {product.stock}
-        <span className="font-medium text-[#9a9a9a]">
-          {" "}
-          / min {product.minStock}
-        </span>
+        <span className="font-medium text-[#9a9a9a]"> / min {product.minStock}</span>
       </p>
       <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-[#ececec]">
         <div
-          className={cn("h-full rounded-full", stockBarTone(product.status))}
+          className={cn('h-full rounded-full', stockBarTone(product.status))}
           style={{ width: `${stockFillPercent(product)}%` }}
         />
       </div>
@@ -100,9 +92,11 @@ function StockCell({ product }: { product: CatalogProduct }) {
 
 function ProductRow({
   product,
+  onEdit,
   onDelete,
 }: {
   product: CatalogProduct;
+  onEdit: (product: CatalogProduct) => void;
   onDelete: (id: string) => void;
 }) {
   return (
@@ -110,27 +104,15 @@ function ProductRow({
       <td className="py-4 pr-4">
         <div className="flex min-w-0 items-center gap-3">
           <div className="relative size-11 shrink-0 overflow-hidden rounded-lg border border-[#ececec] bg-[#f7f7f7]">
-            <Image
-              src={product.image}
-              alt=""
-              fill
-              className="object-cover"
-              sizes="44px"
-            />
+            <Image src={product.image} alt="" fill className="object-cover" sizes="44px" />
           </div>
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-aurora-ink">
-              {product.name}
-            </p>
-            <p className="mt-0.5 truncate text-xs text-[#9a9a9a]">
-              {product.description}
-            </p>
+            <p className="truncate text-sm font-semibold text-aurora-ink">{product.name}</p>
+            <p className="mt-0.5 truncate text-xs text-[#9a9a9a]">{product.description}</p>
           </div>
         </div>
       </td>
-      <td className="px-3 py-4 text-sm whitespace-nowrap text-[#6b7280]">
-        {product.sku}
-      </td>
+      <td className="px-3 py-4 text-sm whitespace-nowrap text-[#6b7280]">{product.sku}</td>
       <td className="px-3 py-4 text-sm text-[#6b7280]">{product.category}</td>
       <td className="px-3 py-4 text-sm font-medium whitespace-nowrap text-aurora-ink">
         {product.priceLabel}
@@ -145,6 +127,7 @@ function ProductRow({
         <div className="flex items-center gap-1.5">
           <button
             type="button"
+            onClick={() => onEdit(product)}
             className="inline-flex size-8 items-center justify-center rounded-lg border border-[#e0e0e0] text-[#6b7280] transition-colors hover:bg-[#f7f7f7] hover:text-aurora-ink"
             aria-label={`Edit ${product.name}`}
           >
@@ -164,12 +147,23 @@ function ProductRow({
   );
 }
 
-const FILTERS = ["All Products", "In Stock", "Low Stock", "Critical", "Out of Stock"] as const;
+const FILTERS = ['All Products', 'In Stock', 'Low Stock', 'Critical', 'Out of Stock'] as const;
 
 export function ProductCatalog() {
-  const [products, setProducts] = useState(CATALOG_PRODUCTS);
-  const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<(typeof FILTERS)[number]>("All Products");
+  const [products, setProducts] = useState<CatalogProduct[]>([]);
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<(typeof FILTERS)[number]>('All Products');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [isAdding, setIsAdding] = useState(false);
+
+  useEffect(() => {
+    void bffCall<Array<ShopProduct & { sku?: string; minStock?: number }>>('listProducts')
+      .then((rows) => {
+        if (Array.isArray(rows)) setProducts(rows.map((row) => toCatalogProduct(row)));
+      })
+      .catch(() => undefined);
+  }, []);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -181,18 +175,74 @@ export function ProductCatalog() {
         p.category.toLowerCase().includes(q);
 
       const matchesFilter =
-        filter === "All Products" ||
-        (filter === "In Stock" && p.status === "IN STOCK") ||
-        (filter === "Low Stock" && p.status === "LOW STOCK") ||
-        (filter === "Critical" && p.status === "CRITICAL") ||
-        (filter === "Out of Stock" && p.status === "OUT OF STOCK");
+        filter === 'All Products' ||
+        (filter === 'In Stock' && p.status === 'IN STOCK') ||
+        (filter === 'Low Stock' && p.status === 'LOW STOCK') ||
+        (filter === 'Critical' && p.status === 'CRITICAL') ||
+        (filter === 'Out of Stock' && p.status === 'OUT OF STOCK');
 
       return matchesQuery && matchesFilter;
     });
   }, [products, query, filter]);
 
+  const editingProduct =
+    editingId === null ? null : (products.find((product) => product.id === editingId) ?? null);
+
+  const removingProduct =
+    removingId === null ? null : (products.find((product) => product.id === removingId) ?? null);
+
   function handleDelete(id: string) {
-    setProducts((prev) => prev.filter((p) => p.id !== id));
+    void bffCall('deleteProduct', { params: { id } })
+      .then(() => {
+        setProducts((prev) => prev.filter((p) => p.id !== id));
+        setRemovingId(null);
+      })
+      .catch(() => undefined);
+  }
+
+  function handleSave(next: CatalogProduct) {
+    const price = Number(next.priceLabel.replace(/[^\d]/g, '')) || 0;
+    const slug = next.sku
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+    const payload = {
+      name: next.name,
+      subtitle: next.description,
+      sku: next.sku,
+      category: next.category,
+      brand: next.category,
+      price,
+      quantity: next.stock,
+      minStock: next.minStock,
+      slug: slug || `product-${Date.now()}`,
+      image: next.image || '/images/auth-panel.png',
+      images: [next.image || '/images/auth-panel.png'],
+    };
+    const exists = products.some((product) => product.id === next.id);
+    const request = exists
+      ? bffCall<ShopProduct & { sku?: string; minStock?: number }>('updateProduct', {
+          params: { id: next.id },
+          body: payload,
+        })
+      : bffCall<ShopProduct & { sku?: string; minStock?: number }>('createProduct', {
+          body: payload,
+        });
+
+    void request
+      .then((saved) => {
+        const mapped = toCatalogProduct(saved);
+        setProducts((prev) => {
+          const found = prev.some((product) => product.id === mapped.id);
+          if (found) {
+            return prev.map((product) => (product.id === mapped.id ? mapped : product));
+          }
+          return [mapped, ...prev];
+        });
+        setEditingId(null);
+        setIsAdding(false);
+      })
+      .catch(() => undefined);
   }
 
   return (
@@ -202,13 +252,15 @@ export function ProductCatalog() {
           <h1 className="text-[1.75rem] font-bold tracking-tight text-aurora-ink">
             Product Catalog
           </h1>
-          <p className="mt-1 text-sm text-[#8a8a8a]">
-            {CATALOG_TOTAL_COUNT} Products in Catalog
-          </p>
+          <p className="mt-1 text-sm text-[#8a8a8a]">{products.length} Products in Catalog</p>
         </div>
 
         <button
           type="button"
+          onClick={() => {
+            setEditingId(null);
+            setIsAdding(true);
+          }}
           className="inline-flex h-11 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg bg-aurora-lime px-4 text-sm font-semibold text-aurora-ink transition-opacity hover:opacity-90"
         >
           <span aria-hidden className="text-lg leading-none">
@@ -241,9 +293,7 @@ export function ProductCatalog() {
 
         <select
           value={filter}
-          onChange={(e) =>
-            setFilter(e.target.value as (typeof FILTERS)[number])
-          }
+          onChange={(e) => setFilter(e.target.value as (typeof FILTERS)[number])}
           className="h-11 rounded-xl border border-[#e5e5e5] bg-white px-3 text-sm font-medium text-aurora-ink outline-none focus:border-aurora-ink/30"
         >
           {FILTERS.map((option) => (
@@ -256,34 +306,25 @@ export function ProductCatalog() {
 
       <div className="overflow-hidden rounded-2xl border border-[#e5e5e5] bg-white">
         <div className="overflow-x-auto px-5 sm:px-6">
-          <table className="w-full min-w-[900px] border-collapse text-left">
+          <table className="w-full min-w-225 border-collapse text-left">
             <thead>
               <tr className="border-b border-[#ececec]">
-                {[
-                  "Product",
-                  "SKU",
-                  "Category",
-                  "Price",
-                  "Stock",
-                  "Status",
-                  "Actions",
-                ].map((label) => (
-                  <th
-                    key={label}
-                    className="py-3.5 text-xs font-semibold tracking-wide text-[#9a9a9a] uppercase first:pr-4 last:pl-3 not-first:px-3"
-                  >
-                    {label}
-                  </th>
-                ))}
+                {['Product', 'SKU', 'Category', 'Price', 'Stock', 'Status', 'Actions'].map(
+                  (label) => (
+                    <th
+                      key={label}
+                      className="py-3.5 text-xs font-semibold tracking-wide text-[#9a9a9a] uppercase first:pr-4 last:pl-3 not-first:px-3"
+                    >
+                      {label}
+                    </th>
+                  ),
+                )}
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan={7}
-                    className="py-16 text-center text-sm text-[#8a8a8a]"
-                  >
+                  <td colSpan={7} className="py-16 text-center text-sm text-[#8a8a8a]">
                     No products match this search.
                   </td>
                 </tr>
@@ -292,7 +333,11 @@ export function ProductCatalog() {
                   <ProductRow
                     key={product.id}
                     product={product}
-                    onDelete={handleDelete}
+                    onEdit={(next) => {
+                      setIsAdding(false);
+                      setEditingId(next.id);
+                    }}
+                    onDelete={(id) => setRemovingId(id)}
                   />
                 ))
               )}
@@ -302,7 +347,7 @@ export function ProductCatalog() {
 
         <div className="flex flex-col gap-3 border-t border-[#ececec] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <p className="text-sm text-[#8a8a8a]">
-            Showing 1-{filtered.length} of {CATALOG_TOTAL_COUNT} products
+            Showing 1-{filtered.length} of {products.length} products
           </p>
           <div className="flex flex-wrap items-center gap-1.5">
             <button
@@ -316,10 +361,10 @@ export function ProductCatalog() {
                 key={page}
                 type="button"
                 className={cn(
-                  "inline-flex size-9 items-center justify-center rounded-lg text-sm font-semibold",
+                  'inline-flex size-9 items-center justify-center rounded-lg text-sm font-semibold',
                   page === 1
-                    ? "bg-aurora-lime text-aurora-ink"
-                    : "border border-[#e0e0e0] text-[#6b7280] hover:bg-[#f7f7f7]",
+                    ? 'bg-aurora-lime text-aurora-ink'
+                    : 'border border-[#e0e0e0] text-[#6b7280] hover:bg-[#f7f7f7]',
                 )}
               >
                 {page}
@@ -341,6 +386,33 @@ export function ProductCatalog() {
           </div>
         </div>
       </div>
+
+      {editingProduct ? (
+        <EditProductModal
+          key={editingProduct.id}
+          mode="edit"
+          product={editingProduct}
+          onClose={() => setEditingId(null)}
+          onSave={handleSave}
+        />
+      ) : null}
+
+      {isAdding ? (
+        <EditProductModal
+          key="add-product"
+          mode="add"
+          onClose={() => setIsAdding(false)}
+          onSave={handleSave}
+        />
+      ) : null}
+
+      {removingProduct ? (
+        <RemoveProductModal
+          product={removingProduct}
+          onClose={() => setRemovingId(null)}
+          onConfirm={() => handleDelete(removingProduct.id)}
+        />
+      ) : null}
     </div>
   );
 }

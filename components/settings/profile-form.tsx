@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Field, TextInput } from "@/components/auth/form-controls";
 import { Avatar } from "@/components/ui/avatar";
+import { bffCall } from "@/lib/bff/generated/client";
 import {
   DEFAULT_PROFILE,
   type ProfileSettings,
@@ -20,9 +21,17 @@ export function ProfileForm() {
     if (savedMessage) setSavedMessage(null);
   }
 
+  useEffect(() => {
+    void bffCall<ProfileSettings>("getProfileSettings")
+      .then((profile) => setForm({ ...DEFAULT_PROFILE, ...profile }))
+      .catch(() => undefined);
+  }, []);
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setSavedMessage("Profile changes saved.");
+    void bffCall("updateProfileSettings", { body: form })
+      .then(() => setSavedMessage("Profile changes saved."))
+      .catch(() => setSavedMessage("Could not save profile."));
   }
 
   function handleCancel() {

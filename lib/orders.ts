@@ -27,6 +27,7 @@ export type OrderLineItem = {
 
 export type OrderRecord = {
   id: string;
+  internalId?: string;
   status: OrderStatus;
   date: string;
   placedAt: string;

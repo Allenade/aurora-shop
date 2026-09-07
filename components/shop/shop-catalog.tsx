@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ProductCard } from "@/components/shop/product-card";
 import {
   ShopFilters,
   type ShopFilterState,
 } from "@/components/shop/shop-filters";
+import { bffCall } from "@/lib/bff/generated/client";
 import {
   SHOP_PRICE_MAX,
   SHOP_PRODUCTS,
@@ -51,10 +52,19 @@ function filterProducts(
 export function ShopCatalog() {
   const [filters, setFilters] = useState<ShopFilterState>(initialFilters);
   const [view, setView] = useState<"grid" | "list">("grid");
+  const [catalog, setCatalog] = useState<ShopProduct[]>(SHOP_PRODUCTS);
+
+  useEffect(() => {
+    void bffCall<ShopProduct[]>("listProducts")
+      .then((rows) => {
+        if (Array.isArray(rows) && rows.length > 0) setCatalog(rows);
+      })
+      .catch(() => undefined);
+  }, []);
 
   const products = useMemo(
-    () => filterProducts(SHOP_PRODUCTS, filters),
-    [filters],
+    () => filterProducts(catalog, filters),
+    [catalog, filters],
   );
 
   return (

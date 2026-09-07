@@ -2,22 +2,15 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { BankTransferPayment } from "@/components/cart/bank-transfer-payment";
-import {
-  CardPaymentForm,
-  INITIAL_CARD_FORM,
-  validateCardForm,
-  type CardFormState,
-} from "@/components/cart/card-payment-form";
+import { CardPaymentForm } from "@/components/cart/card-payment-form";
 import { CheckoutSteps } from "@/components/cart/checkout-steps";
 import { DeliveryInformationForm } from "@/components/cart/delivery-information-form";
 import { OrderPlacedSuccess } from "@/components/cart/order-placed-success";
 import { OrderSummaryCard } from "@/components/cart/order-summary-card";
 import { ReviewPayment } from "@/components/cart/review-payment";
 import {
-  createOrderId,
-  createTransferReference,
   DELIVERY_METHODS,
   getCartTotals,
   INITIAL_DELIVERY_FORM,
@@ -25,17 +18,13 @@ import {
   type DeliveryMethodId,
   type PaymentMethodId,
 } from "@/lib/cart";
-import {
-  buildOrderReceipt,
-  createTrackingNumber,
-  saveOrderReceipt,
-} from "@/lib/receipts";
 import { Action, Resource, RequirePermission } from "@/lib/permissions";
 import {
   getDefaultProduct,
   getProductBySlug,
   type ShopProduct,
 } from "@/lib/shop";
+import { bffCall } from "@/lib/bff/generated/client";
 
 function PlaceOrderIcon() {
   return (
@@ -70,23 +59,25 @@ function CheckoutPageContent() {
   }, [addSlug]);
 
   const [phase, setPhase] = useState<CheckoutPhase>("delivery");
-  const [lines] = useState(initialLines);
+  const [lines, setLines] = useState(initialLines);
   const [form, setForm] = useState<DeliveryFormState>(INITIAL_DELIVERY_FORM);
   const [errors, setErrors] = useState<
     Partial<Record<keyof DeliveryFormState, string>>
   >({});
-  const [cardForm, setCardForm] = useState<CardFormState>(INITIAL_CARD_FORM);
-  const [cardErrors, setCardErrors] = useState<
-    Partial<Record<keyof CardFormState, string>>
-  >({});
+  const [authorizationUrl, setAuthorizationUrl] = useState<string | null>(null);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [deliveryId, setDeliveryId] = useState<DeliveryMethodId>("standard");
-  const [paymentMethod, setPaymentMethod] =
-    useState<PaymentMethodId>("bank");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethodId>("bank");
   const [orderId, setOrderId] = useState<string | null>(null);
   const [trackingNumber, setTrackingNumber] = useState<string | null>(null);
   const [transferReference, setTransferReference] = useState<string | null>(
     null,
   );
+  const [bankDetails, setBankDetails] = useState<{
+    bank: string;
+    accountName: string;
+    accountNumber: string;
+  } | null>(null);
 
   const delivery =
     DELIVERY_METHODS.find((m) => m.id === deliveryId) ?? DELIVERY_METHODS[0]!;
@@ -103,11 +94,68 @@ function CheckoutPageContent() {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  function updateCardForm<K extends keyof CardFormState>(
-    key: K,
-    value: CardFormState[K],
-  ) {
-    setCardForm((prev) => ({ ...prev, [key]: value }));
+  useEffect(() => {
+    if (!addSlug) return;
+    void bffCall<ShopProduct>("getProductBySlug", { params: { slug: addSlug } })
+      .then((product) => setLines([{ product, qty: 1 }]))
+      .catch(() => undefined);
+  }, [addSlug]);
+
+  useEffect(() => {
+    const payRef = searchParams.get("pay");
+    const mock = searchParams.get("mock");
+    if (!payRef || mock !== "1") return;
+    void bffCall("handlePaymentCallback", {
+      params: { provider: "paystack" },
+      body: {
+        event: "charge.success",
+        data: { reference: payRef, status: "success" },
+      },
+    })
+      .then(() => {
+        setOrderId(payRef);
+        setTrackingNumber(payRef);
+        setPhase("success");
+      })
+      .catch(() => undefined);
+  }, [searchParams]);
+
+  async function placeOrderOnServer() {
+    const result = await bffCall<{
+      id: string;
+      trackingNumber: string;
+      payment?: {
+        reference?: string;
+        authorizationUrl?: string;
+        bank?: { bank: string; accountName: string; accountNumber: string };
+      };
+    }>("createCheckout", {
+      body: {
+        deliveryMethod: deliveryId,
+        paymentMethod,
+        fullName: form.fullName,
+        email: form.email,
+        phone: form.phone,
+        city: form.city,
+        streetAddress: form.streetAddress,
+        state: form.state,
+        note: form.note,
+        items: lines.map((line) => ({
+          slug: line.product.slug,
+          qty: line.qty,
+        })),
+        idempotencyKey:
+          typeof crypto !== "undefined" && "randomUUID" in crypto
+            ? crypto.randomUUID()
+            : `${Date.now()}`,
+      },
+    });
+    setOrderId(result.id);
+    setTrackingNumber(result.trackingNumber);
+    setTransferReference(result.payment?.reference ?? result.id);
+    setAuthorizationUrl(result.payment?.authorizationUrl ?? null);
+    setBankDetails(result.payment?.bank ?? null);
+    return result;
   }
 
   function validate() {
@@ -125,20 +173,9 @@ function CheckoutPageContent() {
     return Object.keys(next).length === 0;
   }
 
-  function completeOrder(nextOrderId: string) {
-    const nextTracking = createTrackingNumber();
-    saveOrderReceipt(
-      buildOrderReceipt({
-        orderId: nextOrderId,
-        trackingNumber: nextTracking,
-        form,
-        delivery,
-        paymentMethod,
-        lines,
-      }),
-    );
+  function completeOrder(nextOrderId: string, nextTracking?: string) {
     setOrderId(nextOrderId);
-    setTrackingNumber(nextTracking);
+    setTrackingNumber(nextTracking ?? trackingNumber ?? nextOrderId);
     setPhase("success");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -152,43 +189,40 @@ function CheckoutPageContent() {
     }
 
     if (phase === "review") {
-      if (paymentMethod === "bank") {
-        const nextOrderId = orderId ?? createOrderId();
-        const nextReference =
-          transferReference ?? createTransferReference();
-        setOrderId(nextOrderId);
-        setTransferReference(nextReference);
-        setPhase("bank");
-        window.scrollTo({ top: 0, behavior: "smooth" });
-        return;
-      }
-
-      setCardForm((prev) => ({
-        ...prev,
-        cardholderName: prev.cardholderName || form.fullName,
-      }));
-      setCardErrors({});
-      setPhase("card");
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      void (async () => {
+        try {
+          setCheckoutError(null);
+          await placeOrderOnServer();
+          setPhase(paymentMethod === "bank" ? "bank" : "card");
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        } catch (error) {
+          setCheckoutError(
+            error instanceof Error ? error.message : "Unable to place order",
+          );
+        }
+      })();
     }
   }
 
   function handleTransferCompleted() {
-    completeOrder(orderId ?? createOrderId());
+    if (!orderId || !trackingNumber) return;
+    completeOrder(orderId, trackingNumber);
   }
 
   function handleCardPlaceOrder() {
-    const next = validateCardForm(cardForm);
-    setCardErrors(next);
-    if (Object.keys(next).length > 0) return;
-    completeOrder(createOrderId());
+    if (authorizationUrl) {
+      window.location.href = authorizationUrl;
+      return;
+    }
+    if (!orderId || !trackingNumber) return;
+    completeOrder(orderId, trackingNumber);
   }
 
   function handleChooseAnotherMethod() {
     setPhase("review");
     setTransferReference(null);
     setOrderId(null);
-    setCardErrors({});
+    setAuthorizationUrl(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -248,15 +282,18 @@ function CheckoutPageContent() {
               amount={total}
               transferReference={transferReference}
               payerName={form.fullName}
+              bank={bankDetails}
             />
           ) : null}
 
           {phase === "card" ? (
             <CardPaymentForm
-              form={cardForm}
-              errors={cardErrors}
-              onChange={updateCardForm}
+              authorizationUrl={authorizationUrl}
+              onPay={handleCardPlaceOrder}
             />
+          ) : null}
+          {checkoutError ? (
+            <p className="mt-3 text-sm text-[#d64545]">{checkoutError}</p>
           ) : null}
         </div>
 

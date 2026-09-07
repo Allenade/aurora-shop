@@ -1,12 +1,10 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { TrackOrderResult } from "@/components/track-orders/track-order-result";
-import {
-  findShipmentByTracking,
-  type TrackedShipment,
-} from "@/lib/track-orders";
+import { bffCall } from "@/lib/bff/generated/client";
+import type { TrackedShipment } from "@/lib/track-orders";
 
 function SearchIcon() {
   return (
@@ -31,32 +29,49 @@ function SearchIcon() {
 function TrackOrderContent() {
   const searchParams = useSearchParams();
   const initialQuery = searchParams.get("q")?.trim() ?? "";
-  const initialShipment = initialQuery
-    ? findShipmentByTracking(initialQuery)
-    : null;
-
   const [query, setQuery] = useState(initialQuery);
-  const [shipment, setShipment] = useState<TrackedShipment | null>(
-    initialShipment,
-  );
-  const [error, setError] = useState<string | null>(() =>
-    initialQuery && !initialShipment
-      ? "No order found for that tracking number. Try TRK-897420."
-      : null,
-  );
+  const [shipment, setShipment] = useState<TrackedShipment | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [searched, setSearched] = useState(Boolean(initialQuery));
+  const [loading, setLoading] = useState(false);
+
+  async function lookup(nextQuery: string) {
+    const q = nextQuery.trim();
+    setSearched(true);
+    if (!q) {
+      setShipment(null);
+      setError("Enter a tracking or order number.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const result = await bffCall<TrackedShipment>("trackOrder", {
+        query: { q },
+      });
+      setShipment(result);
+      setError(null);
+    } catch {
+      setShipment(null);
+      setError("No order found for that tracking number.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   function handleTrack(e: React.FormEvent) {
     e.preventDefault();
-    const result = findShipmentByTracking(query);
-    setSearched(true);
-    setShipment(result);
-    setError(
-      result
-        ? null
-        : "No order found for that tracking number. Try TRK-897420.",
-    );
+    void lookup(query);
   }
+
+  useEffect(() => {
+    if (!initialQuery) return;
+    const timer = setTimeout(() => {
+      void lookup(initialQuery);
+    }, 0);
+    return () => clearTimeout(timer);
+    // initial URL lookup only
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="mx-auto w-full max-w-3xl">
@@ -95,6 +110,10 @@ function TrackOrderContent() {
           Track Order
         </button>
       </form>
+
+      {loading ? (
+        <p className="mt-4 text-sm text-[#8a8a8a]">Looking up shipment…</p>
+      ) : null}
 
       {error ? (
         <p className="mt-4 text-sm font-medium text-[#d64545]" role="alert">

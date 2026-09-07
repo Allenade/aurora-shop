@@ -6,6 +6,7 @@ import {
   Field,
   TextInput,
 } from "@/components/auth/form-controls";
+import { bffCall } from "@/lib/bff/generated/client";
 import { cn } from "@/lib/utils";
 
 type PasswordFieldProps = {
@@ -111,9 +112,18 @@ export function SecurityForm() {
     e.preventDefault();
     setSavedMessage(null);
     if (!validate()) return;
-    setSavedMessage("Password updated successfully.");
-    setForm(INITIAL);
-    setVisible({ current: false, next: false, confirm: false });
+    void bffCall("updateSettingsPassword", {
+      body: {
+        currentPassword: form.currentPassword,
+        newPassword: form.newPassword,
+      },
+    })
+      .then(() => {
+        setSavedMessage("Password updated successfully.");
+        setForm(INITIAL);
+        setVisible({ current: false, next: false, confirm: false });
+      })
+      .catch(() => setSavedMessage("Could not update password."));
   }
 
   return (

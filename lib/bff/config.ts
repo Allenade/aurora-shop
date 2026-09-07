@@ -29,6 +29,8 @@ export type SessionPayload = {
   email: string;
   typ: UserType;
   exp: number;
+  accessToken?: string;
+  refreshToken?: string;
 };
 
 export type LoginInput = {
@@ -41,4 +43,6 @@ export type LoginResult = {
   user: SessionUser;
   /** Where the UI should send the user after login. */
   redirectTo: string;
+  accessToken?: string;
+  refreshToken?: string;
 };

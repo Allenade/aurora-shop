@@ -5,6 +5,7 @@ import {
 import type { SessionUser, UserType } from "@/lib/permissions/permissions.types";
 import type { LoginInput, LoginResult, SessionPayload } from "@/lib/bff/config";
 import { getAuthMode, getBackendUrl } from "@/lib/bff/config";
+import { AuthError, nestFetch } from "@/lib/bff/nest";
 
 function withEmail(user: SessionUser, email: string): SessionUser {
   const [local] = email.split("@");
@@ -66,38 +67,34 @@ async function mockMe(session: SessionPayload): Promise<SessionUser | null> {
   return mockUserForType(session.typ, session.email);
 }
 
+type NestAuthResponse = LoginResult & {
+  accessToken?: string;
+  refreshToken?: string;
+};
+
 async function upstreamLogin(input: LoginInput): Promise<LoginResult> {
-  void input;
-  const base = getBackendUrl();
-  if (!base) {
+  if (!getBackendUrl()) {
     throw new AuthError("BACKEND_URL is not configured", 503);
   }
-  // Wire to real auth when backend is ready:
-  // const res = await fetch(`${base}/auth/login`, { ... });
-  // Store upstream tokens only in httpOnly cookie / server session — never return JWT to the client.
-  throw new AuthError("Upstream auth is not connected yet", 501);
+  return nestFetch<NestAuthResponse>("/auth/login", {
+    method: "POST",
+    body: JSON.stringify(input),
+    session: null,
+  });
 }
 
 async function upstreamMe(session: SessionPayload): Promise<SessionUser | null> {
-  void session;
-  const base = getBackendUrl();
-  if (!base) {
+  if (!getBackendUrl()) {
     throw new AuthError("BACKEND_URL is not configured", 503);
   }
-  throw new AuthError("Upstream auth is not connected yet", 501);
-}
-
-export class AuthError extends Error {
-  status: number;
-
-  constructor(message: string, status = 400) {
-    super(message);
-    this.name = "AuthError";
-    this.status = status;
+  if (!session.accessToken && !session.refreshToken) {
+    throw new AuthError("Unauthorized", 401);
   }
+  return nestFetch<SessionUser>("/auth/me", { session });
 }
 
-/** Auth upstream: mock today, real backend when AUTH_MODE=upstream. */
+export { AuthError };
+
 export async function upstreamLoginUser(
   input: LoginInput,
 ): Promise<LoginResult> {
@@ -112,10 +109,43 @@ export async function upstreamCurrentUser(
   return mockMe(session);
 }
 
-export function sessionFieldsFromUser(user: SessionUser) {
+export async function upstreamRegister(input: Record<string, unknown>) {
+  return nestFetch<{ ok: true; email: string }>("/auth/register", {
+    method: "POST",
+    body: JSON.stringify(input),
+    session: null,
+  });
+}
+
+export async function upstreamVerifyOtp(email: string, code: string) {
+  return nestFetch<NestAuthResponse>("/auth/otp/verify", {
+    method: "POST",
+    body: JSON.stringify({ email, code }),
+    session: null,
+  });
+}
+
+export async function upstreamLogout(session: SessionPayload | null) {
+  if (!session?.accessToken || getAuthMode() !== "upstream") return { ok: true };
+  try {
+    return await nestFetch<{ ok: true }>("/auth/logout", {
+      method: "POST",
+      session,
+    });
+  } catch {
+    return { ok: true };
+  }
+}
+
+export function sessionFieldsFromUser(
+  user: SessionUser,
+  tokens?: { accessToken?: string; refreshToken?: string },
+) {
   return {
     sub: user.id,
     email: user.email,
     typ: user.type,
+    accessToken: tokens?.accessToken,
+    refreshToken: tokens?.refreshToken,
   };
 }
