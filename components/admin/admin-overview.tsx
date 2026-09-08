@@ -52,13 +52,12 @@ export function AdminOverview() {
   const [greeting, setGreeting] = useState<AdminGreetingData>(() =>
     buildGreeting(null),
   );
-  const [loading, setLoading] = useState(true);
+  const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const loading = !ready;
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
 
     void Promise.all([
       bffCall<SessionUser>("getAuthMe").catch(() => null),
@@ -73,6 +72,8 @@ export function AdminOverview() {
         setBreakdown(
           Array.isArray(data.orderBreakdown) ? data.orderBreakdown : [],
         );
+        setError(null);
+        setReady(true);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -85,9 +86,7 @@ export function AdminOverview() {
         setRecentOrders([]);
         setAlerts([]);
         setBreakdown([]);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+        setReady(true);
       });
 
     return () => {

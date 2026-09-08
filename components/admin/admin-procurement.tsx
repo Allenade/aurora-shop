@@ -166,23 +166,27 @@ export function AdminProcurement() {
   const [pageCount, setPageCount] = useState(1);
   const [awaitingReview, setAwaitingReview] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [fetchState, setFetchState] = useState<{
+    key: string | null;
+    error: string | null;
+  }>({ key: null, error: null });
+
+  const fetchKey = `${debouncedQuery}\0${filter}\0${page}\0${reloadKey}`;
+  const loading = fetchState.key !== fetchKey;
+  const error = fetchState.key === fetchKey ? fetchState.error : null;
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 300);
+    const timer = window.setTimeout(() => {
+      setDebouncedQuery(query.trim());
+      setPage(1);
+    }, 300);
     return () => window.clearTimeout(timer);
   }, [query]);
 
   useEffect(() => {
-    setPage(1);
-  }, [debouncedQuery, filter]);
-
-  useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
+    const key = fetchKey;
 
     void bffCall<QuotesListResponse>('listQuotes', {
       query: {
@@ -196,10 +200,13 @@ export function AdminProcurement() {
         if (cancelled) return;
         const paginated = res && !Array.isArray(res) && Array.isArray(res.items);
         const rows = Array.isArray(res) ? res : paginated ? res.items : [];
+        const nextPageCount = paginated
+          ? Math.max(1, res.pageCount ?? 1)
+          : 1;
         setRequests(rows.map((row) => toAdminProcurement(row)));
         if (paginated) {
           setTotal(res.total ?? rows.length);
-          setPageCount(Math.max(1, res.pageCount ?? 1));
+          setPageCount(nextPageCount);
           setAwaitingReview(res.awaitingReview ?? 0);
         } else {
           setTotal(rows.length);
@@ -210,27 +217,28 @@ export function AdminProcurement() {
             ).length,
           );
         }
+        setFetchState({ key, error: null });
+        setPage((current) => (current > nextPageCount ? nextPageCount : current));
       })
       .catch((err) => {
         if (cancelled) return;
-        setError(
-          err instanceof BffRequestError
-            ? err.message
-            : 'Unable to load procurement requests from the API.',
-        );
         setRequests([]);
         setTotal(0);
         setPageCount(1);
         setAwaitingReview(0);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+        setFetchState({
+          key,
+          error:
+            err instanceof BffRequestError
+              ? err.message
+              : 'Unable to load procurement requests from the API.',
+        });
       });
 
     return () => {
       cancelled = true;
     };
-  }, [debouncedQuery, filter, page, reloadKey]);
+  }, [fetchKey, debouncedQuery, filter, page, reloadKey]);
 
   const currentPage = Math.min(page, pageCount);
   const rangeStart = total === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
@@ -241,10 +249,6 @@ export function AdminProcurement() {
     [currentPage, pageCount],
   );
 
-  useEffect(() => {
-    if (page > pageCount) setPage(pageCount);
-  }, [page, pageCount]);
-
   const selectedRequest =
     selectedId === null
       ? null
@@ -253,10 +257,12 @@ export function AdminProcurement() {
   function updateStatus(id: string, status: AdminProcurementStatus) {
     const current = requests.find((request) => request.id === id);
     if (!current?.internalId) {
-      setError('Unable to update quote status — missing internal id.');
+      setFetchState((prev) => ({
+        key: prev.key,
+        error: 'Unable to update quote status — missing internal id.',
+      }));
       return;
     }
-    setError(null);
     void bffCall('setQuoteStatus', {
       params: { id: current.internalId },
       body: { status: quoteApiStatus(status) },
@@ -268,11 +274,13 @@ export function AdminProcurement() {
         setReloadKey((key) => key + 1);
       })
       .catch((err) => {
-        setError(
-          err instanceof BffRequestError
-            ? err.message
-            : 'Unable to update quote status.',
-        );
+        setFetchState((prev) => ({
+          key: prev.key,
+          error:
+            err instanceof BffRequestError
+              ? err.message
+              : 'Unable to update quote status.',
+        }));
       });
   }
 
@@ -328,7 +336,10 @@ export function AdminProcurement() {
 
         <select
           value={filter}
-          onChange={(e) => setFilter(e.target.value as (typeof FILTERS)[number])}
+          onChange={(e) => {
+            setFilter(e.target.value as (typeof FILTERS)[number]);
+            setPage(1);
+          }}
           className="h-11 rounded-xl border border-[#e5e5e5] bg-white px-3 text-sm font-medium text-aurora-ink outline-none focus:border-aurora-ink/30"
         >
           {FILTERS.map((option) => (

@@ -216,24 +216,28 @@ export function ProductCatalog() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [fetchState, setFetchState] = useState<{
+    key: string | null;
+    error: string | null;
+  }>({ key: null, error: null });
+
+  const fetchKey = `${debouncedQuery}\0${filter}\0${page}\0${reloadKey}`;
+  const loading = fetchState.key !== fetchKey;
+  const error = fetchState.key === fetchKey ? fetchState.error : null;
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 300);
+    const timer = window.setTimeout(() => {
+      setDebouncedQuery(query.trim());
+      setPage(1);
+    }, 300);
     return () => window.clearTimeout(timer);
   }, [query]);
 
   useEffect(() => {
-    setPage(1);
-  }, [debouncedQuery, filter]);
-
-  useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
+    const key = fetchKey;
 
     void bffCall<ProductListResponse>('listProducts', {
       query: {
@@ -247,32 +251,33 @@ export function ProductCatalog() {
         if (cancelled) return;
         const paginated = res && !Array.isArray(res) && Array.isArray(res.items);
         const items = Array.isArray(res) ? res : paginated ? res.items : [];
+        const nextPageCount = paginated
+          ? Math.max(1, res.pageCount ?? 1)
+          : 1;
         setProducts(items.map((row) => toCatalogProduct(row)));
-        if (paginated) {
-          setTotal(res.total ?? items.length);
-          setPageCount(Math.max(1, res.pageCount ?? 1));
-        } else {
-          setTotal(items.length);
-          setPageCount(1);
-        }
+        setTotal(paginated ? (res.total ?? items.length) : items.length);
+        setPageCount(nextPageCount);
+        setFetchState({ key, error: null });
+        setPage((current) => (current > nextPageCount ? nextPageCount : current));
       })
       .catch((err) => {
         if (cancelled) return;
-        setError(
-          err instanceof BffRequestError ? err.message : 'Unable to load products from the API.',
-        );
         setProducts([]);
         setTotal(0);
         setPageCount(1);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+        setFetchState({
+          key,
+          error:
+            err instanceof BffRequestError
+              ? err.message
+              : 'Unable to load products from the API.',
+        });
       });
 
     return () => {
       cancelled = true;
     };
-  }, [debouncedQuery, filter, page, reloadKey]);
+  }, [fetchKey, debouncedQuery, filter, page, reloadKey]);
 
   const currentPage = Math.min(page, pageCount);
   const rangeStart = total === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
@@ -282,10 +287,6 @@ export function ProductCatalog() {
     [currentPage, pageCount],
   );
 
-  useEffect(() => {
-    if (page > pageCount) setPage(pageCount);
-  }, [page, pageCount]);
-
   const editingProduct =
     editingId === null ? null : (products.find((product) => product.id === editingId) ?? null);
 
@@ -293,16 +294,17 @@ export function ProductCatalog() {
     removingId === null ? null : (products.find((product) => product.id === removingId) ?? null);
 
   function handleDelete(id: string) {
-    setError(null);
     void bffCall('deleteProduct', { params: { id } })
       .then(() => {
         setRemovingId(null);
         setReloadKey((key) => key + 1);
       })
       .catch((err) => {
-        setError(
-          err instanceof BffRequestError ? err.message : 'Unable to delete product.',
-        );
+        setFetchState((prev) => ({
+          key: prev.key,
+          error:
+            err instanceof BffRequestError ? err.message : 'Unable to delete product.',
+        }));
       });
   }
 
@@ -338,7 +340,6 @@ export function ProductCatalog() {
         });
 
     setSaving(true);
-    setError(null);
     void request
       .then(() => {
         setEditingId(null);
@@ -346,9 +347,11 @@ export function ProductCatalog() {
         setReloadKey((key) => key + 1);
       })
       .catch((err) => {
-        setError(
-          err instanceof BffRequestError ? err.message : 'Unable to save product.',
-        );
+        setFetchState((prev) => ({
+          key: prev.key,
+          error:
+            err instanceof BffRequestError ? err.message : 'Unable to save product.',
+        }));
       })
       .finally(() => setSaving(false));
   }
@@ -415,7 +418,10 @@ export function ProductCatalog() {
 
         <select
           value={filter}
-          onChange={(e) => setFilter(e.target.value as (typeof FILTERS)[number])}
+          onChange={(e) => {
+            setFilter(e.target.value as (typeof FILTERS)[number]);
+            setPage(1);
+          }}
           className="h-11 rounded-xl border border-[#e5e5e5] bg-white px-3 text-sm font-medium text-aurora-ink outline-none focus:border-aurora-ink/30"
         >
           {FILTERS.map((option) => (

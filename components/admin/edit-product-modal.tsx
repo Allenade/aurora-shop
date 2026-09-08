@@ -2,7 +2,6 @@
 
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import { createPortal } from 'react-dom';
-import Image from 'next/image';
 import { bffCall } from '@/lib/bff/generated/client';
 import {
   CATALOG_CATEGORIES,
@@ -370,6 +369,8 @@ export function EditProductModal({ mode, product, onClose, onSave }: EditProduct
               {form.image ? (
                 <div className="flex items-center gap-4 rounded-xl border border-[#e5e5e5] bg-[#fafafa] p-3">
                   <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg border border-[#e5e5e5] bg-white">
+                    {/* Preview may be a blob/data URL from local upload */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={form.image}
                       alt="Product preview"
