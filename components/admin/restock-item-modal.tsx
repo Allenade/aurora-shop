@@ -37,11 +37,19 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 
 type RestockItemModalProps = {
   item: InventoryItem;
+  pending?: boolean;
+  error?: string | null;
   onClose: () => void;
   onConfirm: (quantity: number) => void;
 };
 
-export function RestockItemModal({ item, onClose, onConfirm }: RestockItemModalProps) {
+export function RestockItemModal({
+  item,
+  pending = false,
+  error = null,
+  onClose,
+  onConfirm,
+}: RestockItemModalProps) {
   const [entered, setEntered] = useState(false);
   const [quantity, setQuantity] = useState('');
 
@@ -52,7 +60,7 @@ export function RestockItemModal({ item, onClose, onConfirm }: RestockItemModalP
     const frame = requestAnimationFrame(() => setEntered(true));
 
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape' && !pending) onClose();
     }
 
     window.addEventListener('keydown', onKeyDown);
@@ -61,10 +69,11 @@ export function RestockItemModal({ item, onClose, onConfirm }: RestockItemModalP
       document.body.style.overflow = previous;
       window.removeEventListener('keydown', onKeyDown);
     };
-  }, [onClose]);
+  }, [onClose, pending]);
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    if (pending) return;
     const amount = Number(quantity);
     if (!amount || amount < 1) return;
     onConfirm(amount);
@@ -79,7 +88,9 @@ export function RestockItemModal({ item, onClose, onConfirm }: RestockItemModalP
           'absolute inset-0 bg-[#111111]/35 transition-opacity duration-300',
           entered ? 'opacity-100' : 'opacity-0',
         )}
-        onClick={onClose}
+        onClick={() => {
+          if (!pending) onClose();
+        }}
       />
 
       <div
@@ -122,24 +133,33 @@ export function RestockItemModal({ item, onClose, onConfirm }: RestockItemModalP
               value={quantity}
               onChange={(e) => setQuantity(e.target.value.replace(/[^\d]/g, ''))}
               placeholder="Enter Quantity..."
-              className="h-11 w-full rounded-lg border border-[#e5e5e5] bg-white px-3 text-sm text-aurora-ink outline-none placeholder:text-[#9a9a9a] focus:border-aurora-ink/30"
+              className="h-11 w-full rounded-lg border border-[#e5e5e5] bg-white px-3 text-sm text-aurora-ink outline-none placeholder:text-[#9a9a9a] focus:border-aurora-ink/30 disabled:opacity-60"
               required
+              disabled={pending}
             />
           </div>
+
+          {error ? (
+            <p className="mt-3 text-sm text-[#d64545]" role="alert">
+              {error}
+            </p>
+          ) : null}
 
           <div className="mt-6 flex gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex h-11 flex-1 items-center justify-center rounded-lg border border-[#1f1f1f]/25 bg-white px-4 text-sm font-semibold text-aurora-ink transition-colors hover:bg-[#f7f7f7]"
+              disabled={pending}
+              className="inline-flex h-11 flex-1 items-center justify-center rounded-lg border border-[#1f1f1f]/25 bg-white px-4 text-sm font-semibold text-aurora-ink transition-colors hover:bg-[#f7f7f7] disabled:cursor-not-allowed disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="inline-flex h-11 flex-1 items-center justify-center rounded-lg bg-aurora-lime px-4 text-sm font-semibold text-aurora-ink transition-opacity hover:opacity-90"
+              disabled={pending}
+              className="inline-flex h-11 flex-1 items-center justify-center rounded-lg bg-aurora-lime px-4 text-sm font-semibold text-aurora-ink transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Confirm Restock
+              {pending ? 'Restocking…' : 'Confirm Restock'}
             </button>
           </div>
         </form>

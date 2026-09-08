@@ -10,6 +10,7 @@ function statusTone(status: AdminProcurementStatus) {
   if (status === 'Approved') return 'green' as const;
   if (status === 'Under Review') return 'blue' as const;
   if (status === 'Rejected') return 'red' as const;
+  if (status === 'Draft') return 'gray' as const;
   return 'orange' as const;
 }
 

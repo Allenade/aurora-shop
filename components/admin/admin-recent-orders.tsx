@@ -8,6 +8,7 @@ import type { AdminRecentOrder } from '@/lib/admin';
 function statusTone(status: AdminRecentOrder['status']) {
   if (status === 'In Transit') return 'blue' as const;
   if (status === 'Delivered') return 'green' as const;
+  if (status === 'Cancelled') return 'red' as const;
   return 'orange' as const;
 }
 
@@ -21,7 +22,7 @@ export function AdminRecentOrders({ orders, onOpenOrder }: AdminRecentOrdersProp
     <Card className="flex h-full flex-col overflow-hidden">
       <div className="border-b border-[#f0f0f0] px-5 py-4">
         <h2 className="text-base font-semibold text-aurora-ink">Recent Orders</h2>
-        <p className="mt-0.5 text-xs text-[#8a8a8a]">Orders in the past 60 Days</p>
+        <p className="mt-0.5 text-xs text-[#8a8a8a]">Latest orders from the store</p>
       </div>
 
       <div className="overflow-x-auto">
@@ -36,6 +37,13 @@ export function AdminRecentOrders({ orders, onOpenOrder }: AdminRecentOrdersProp
             </tr>
           </thead>
           <tbody>
+            {orders.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-5 py-10 text-center text-sm text-[#8a8a8a]">
+                  No recent orders yet.
+                </td>
+              </tr>
+            ) : null}
             {orders.map((order) => (
               <tr key={order.id} className="border-b border-[#f5f5f5] last:border-0">
                 <td className="px-5 py-3.5">
