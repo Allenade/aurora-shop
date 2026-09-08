@@ -1,7 +1,9 @@
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import { createPortal } from 'react-dom';
+import Image from 'next/image';
+import { bffCall } from '@/lib/bff/generated/client';
 import {
   CATALOG_CATEGORIES,
   CATALOG_STATUS_OPTIONS,
@@ -24,6 +26,7 @@ const EMPTY_FORM = {
   minStock: '20',
   status: 'IN STOCK' as CatalogStatus,
   specs: '',
+  image: '',
 };
 
 function FieldLabel({
@@ -72,6 +75,7 @@ type EditFormState = {
   minStock: string;
   status: CatalogStatus;
   specs: string;
+  image: string;
 };
 
 function toFormState(product: CatalogProduct): EditFormState {
@@ -84,6 +88,7 @@ function toFormState(product: CatalogProduct): EditFormState {
     minStock: String(product.minStock),
     status: product.status,
     specs: product.specs ?? product.description,
+    image: product.image ?? '',
   };
 }
 
@@ -97,6 +102,8 @@ type EditProductModalProps = {
 export function EditProductModal({ mode, product, onClose, onSave }: EditProductModalProps) {
   const isAdd = mode === 'add';
   const [entered, setEntered] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [form, setForm] = useState<EditFormState>(() =>
     product ? toFormState(product) : EMPTY_FORM,
   );
@@ -123,6 +130,56 @@ export function EditProductModal({ mode, product, onClose, onSave }: EditProduct
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
+  async function handleImageUpload(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+      setUploadError('Only PNG, JPG, and WebP images are allowed.');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError('Image size must be less than 5MB.');
+      return;
+    }
+
+    try {
+      setUploadingImage(true);
+      setUploadError(null);
+
+      const presigned = await bffCall<{
+        uploadUrl: string;
+        publicUrl: string;
+        key: string;
+      }>('getStorageUploadUrl', {
+        body: {
+          fileName: file.name,
+          contentType: file.type,
+          folder: 'products',
+        },
+      });
+
+      const uploadRes = await fetch(presigned.uploadUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': file.type,
+        },
+        body: file,
+      });
+
+      if (!uploadRes.ok) {
+        throw new Error('Failed to upload image to Cloudflare R2.');
+      }
+
+      updateField('image', presigned.publicUrl);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Image upload failed');
+    } finally {
+      setUploadingImage(false);
+    }
+  }
+
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
 
@@ -143,7 +200,7 @@ export function EditProductModal({ mode, product, onClose, onSave }: EditProduct
       status: form.status,
       description: specs || name,
       specs,
-      image: product?.image ?? '/images/auth-panel.png',
+      image: form.image || product?.image || '/images/auth-panel.png',
     });
   }
 
@@ -310,24 +367,67 @@ export function EditProductModal({ mode, product, onClose, onSave }: EditProduct
 
             <div>
               <FieldLabel htmlFor="product-image">Product Image</FieldLabel>
-              <label
-                htmlFor="product-image"
-                className="flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-[#d4d4d4] bg-[#fafafa] px-4 py-8 text-center transition-colors hover:border-[#bdbdbd] hover:bg-[#f5f5f5]"
-              >
-                <span className="text-[#9a9a9a]">
-                  <UploadIcon />
-                </span>
-                <p className="mt-3 text-sm font-medium text-aurora-ink">
-                  Click to upload or drag and drop
-                </p>
-                <p className="mt-1 text-xs text-[#9a9a9a]">PNG, JPG up to 5MB</p>
-                <input
-                  id="product-image"
-                  type="file"
-                  accept="image/png,image/jpeg"
-                  className="sr-only"
-                />
-              </label>
+              {form.image ? (
+                <div className="flex items-center gap-4 rounded-xl border border-[#e5e5e5] bg-[#fafafa] p-3">
+                  <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg border border-[#e5e5e5] bg-white">
+                    <img
+                      src={form.image}
+                      alt="Product preview"
+                      className="h-full w-full object-contain"
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-mono text-[#666]">{form.image}</p>
+                    <div className="mt-1.5 flex gap-2">
+                      <label
+                        htmlFor="product-image"
+                        className="cursor-pointer text-xs font-semibold text-aurora-ink hover:underline"
+                      >
+                        Change image
+                      </label>
+                      <span className="text-xs text-[#ccc]">|</span>
+                      <button
+                        type="button"
+                        onClick={() => updateField('image', '')}
+                        className="text-xs font-semibold text-red-600 hover:underline"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <label
+                  htmlFor="product-image"
+                  className={cn(
+                    'flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-[#d4d4d4] bg-[#fafafa] px-4 py-8 text-center transition-colors hover:border-[#bdbdbd] hover:bg-[#f5f5f5]',
+                    uploadingImage && 'pointer-events-none opacity-60',
+                  )}
+                >
+                  <span className="text-[#9a9a9a]">
+                    <UploadIcon />
+                  </span>
+                  <p className="mt-3 text-sm font-medium text-aurora-ink">
+                    {uploadingImage
+                      ? 'Uploading to Cloudflare R2...'
+                      : 'Click to upload or drag and drop'}
+                  </p>
+                  <p className="mt-1 text-xs text-[#9a9a9a]">PNG, JPG, WebP up to 5MB</p>
+                </label>
+              )}
+
+              <input
+                id="product-image"
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="sr-only"
+                onChange={handleImageUpload}
+                disabled={uploadingImage}
+              />
+
+              {uploadError ? (
+                <p className="mt-1.5 text-xs text-red-600">{uploadError}</p>
+              ) : null}
             </div>
           </div>
 

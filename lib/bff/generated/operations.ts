@@ -37,6 +37,8 @@ export const operations = {
   getNotificationSettings: { method: "GET", path: "/settings/notifications" },
   updateNotificationSettings: { method: "PATCH", path: "/settings/notifications" },
   getBillingSettings: { method: "GET", path: "/settings/billing" },
+  getStorageUploadUrl: { method: "POST", path: "/storage/upload-url" },
+  uploadStorageFile: { method: "POST", path: "/storage/upload" },
 } as const;
 
 export type OperationId = keyof typeof operations;
