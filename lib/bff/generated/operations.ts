@@ -6,6 +6,7 @@ export const operations = {
   loginUser: { method: "POST", path: "/auth/login" },
   registerUser: { method: "POST", path: "/auth/register" },
   verifySignupOtp: { method: "POST", path: "/auth/otp/verify" },
+  resendSignupOtp: { method: "POST", path: "/auth/otp/resend" },
   refreshSession: { method: "POST", path: "/auth/refresh" },
   getAuthMe: { method: "GET", path: "/auth/me" },
   logoutUser: { method: "POST", path: "/auth/logout" },

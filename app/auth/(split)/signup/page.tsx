@@ -49,6 +49,8 @@ export default function SignUpPage() {
   const [step1, setStep1] = useState<SignupStep1>(emptyStep1);
   const [step2, setStep2] = useState<SignupStep2>(emptyStep2);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
@@ -90,19 +92,38 @@ export default function SignUpPage() {
   const onCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateStep2()) return;
+    setFormError(null);
+    setBusy(true);
     try {
+      const email = step1.email.trim().toLowerCase();
       await registerRequest({
-        ...step1,
-        ...step2,
-        email: step1.email.trim(),
+        firstName: step1.firstName.trim(),
+        lastName: step1.lastName.trim(),
+        email,
+        phone: step1.phone.trim(),
+        countryCode: step1.countryCode,
+        companyName: step2.companyName.trim(),
+        industry: step2.industry,
+        state: step2.state,
+        password: step2.password,
+        agreeToTerms: step2.agreeToTerms,
       });
-      router.push(`/auth/verify?email=${encodeURIComponent(step1.email.trim())}`);
+      router.push(`/auth/verify?email=${encodeURIComponent(email)}`);
     } catch (error) {
       const message =
         error instanceof BffRequestError
           ? error.message
           : "Unable to create account";
-      setErrors({ email: message });
+      setFormError(message);
+      if (
+        error instanceof BffRequestError &&
+        (error.status === 409 || /email/i.test(message))
+      ) {
+        setErrors({ email: message });
+        setStep(1);
+      }
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -433,18 +454,31 @@ export default function SignUpPage() {
                 ) : null}
               </div>
 
+              {formError ? (
+                <p className="text-sm text-red-600" role="alert">
+                  {formError}
+                </p>
+              ) : null}
+
               <div className="mt-2 flex gap-3">
                 <AuthButton
                   variant="outline"
+                  disabled={busy}
                   onClick={() => {
                     setErrors({});
+                    setFormError(null);
                     setStep(1);
                   }}
                 >
                   Back
                 </AuthButton>
-                <AuthButton type="submit" variant="lime" className="flex-1">
-                  Create Account
+                <AuthButton
+                  type="submit"
+                  variant="lime"
+                  className="flex-1"
+                  disabled={busy}
+                >
+                  {busy ? "Creating…" : "Create Account"}
                 </AuthButton>
               </div>
 
