@@ -396,7 +396,7 @@ export function EditProductModal({ mode, product, onClose, onSave }: EditProduct
 
             <div>
               <FieldLabel htmlFor="product-image">
-                Product Images ({form.images.length}/{MAX_PRODUCT_IMAGES})
+                {`Product Images (${form.images.length}/${MAX_PRODUCT_IMAGES})`}
               </FieldLabel>
               <p className="mb-2 text-xs text-[#9a9a9a]">
                 Upload up to {MAX_PRODUCT_IMAGES} images. The first image is the primary
