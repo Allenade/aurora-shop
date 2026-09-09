@@ -58,6 +58,7 @@ export type SessionUser = {
   firstName: string;
   lastName: string;
   type: UserType;
+  avatarUrl?: string | null;
   roles: AppRole[];
   permissions: AppPermission[];
   rules: SerializedRule[];

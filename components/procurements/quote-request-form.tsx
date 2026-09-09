@@ -57,13 +57,21 @@ function requiredLabel(text: string) {
 
 type QuoteRequestFormProps = {
   editingQuote?: RecentQuote | null;
+  busy?: boolean;
   onClearEdit?: () => void;
-  onSubmitted?: (form: QuoteFormState, editingQuote: RecentQuote | null) => void;
-  onSaveDraft?: (form: QuoteFormState, editingQuote: RecentQuote | null) => void;
+  onSubmitted?: (
+    form: QuoteFormState,
+    editingQuote: RecentQuote | null,
+  ) => void | Promise<void>;
+  onSaveDraft?: (
+    form: QuoteFormState,
+    editingQuote: RecentQuote | null,
+  ) => void | Promise<void>;
 };
 
 export function QuoteRequestForm({
   editingQuote = null,
+  busy = false,
   onClearEdit,
   onSubmitted,
   onSaveDraft,
@@ -74,7 +82,6 @@ export function QuoteRequestForm({
   const [errors, setErrors] = useState<
     Partial<Record<keyof QuoteFormState, string>>
   >({});
-  const [savedMessage, setSavedMessage] = useState<string | null>(null);
 
   function update<K extends keyof QuoteFormState>(
     key: K,
@@ -101,32 +108,19 @@ export function QuoteRequestForm({
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setSavedMessage(null);
+    if (busy) return;
     if (!validate()) return;
-
-    if (editingQuote && editingQuote.status !== "Draft") {
-      setSavedMessage(`Quote ${editingQuote.id} updated.`);
-      setForm(INITIAL);
-      onClearEdit?.();
-      return;
-    }
-
-    onSubmitted?.(form, editingQuote);
+    void onSubmitted?.(form, editingQuote);
   }
 
   function handleSaveDraft() {
+    if (busy) return;
     setErrors({});
-    onSaveDraft?.(form, editingQuote);
-    setSavedMessage(
-      editingQuote?.status === "Draft"
-        ? `Draft ${editingQuote.id} updated.`
-        : "Draft saved.",
-    );
-    setForm(INITIAL);
-    onClearEdit?.();
+    void onSaveDraft?.(form, editingQuote);
   }
 
   function onCancelEdit() {
+    if (busy) return;
     onClearEdit?.();
   }
 
@@ -326,27 +320,27 @@ export function QuoteRequestForm({
         </Field>
       </div>
 
-      {savedMessage ? (
-        <p className="mt-4 text-sm font-medium text-[#1f9d57]" role="status">
-          {savedMessage}
-        </p>
-      ) : null}
-
       <div className="mt-5 flex flex-col gap-2.5 sm:flex-row sm:items-center">
         <button
           type="submit"
-          className="inline-flex h-11 items-center justify-center whitespace-nowrap rounded-lg bg-aurora-lime px-5 text-sm font-semibold text-aurora-ink transition-opacity hover:opacity-90"
+          disabled={busy}
+          className="inline-flex h-11 items-center justify-center whitespace-nowrap rounded-lg bg-aurora-lime px-5 text-sm font-semibold text-aurora-ink transition-opacity hover:opacity-90 disabled:opacity-60"
         >
           {editingQuote && editingQuote.status !== "Draft"
-            ? "Update Quote"
-            : "Submit Quote Request"}
+            ? busy
+              ? "Updating…"
+              : "Update Quote"
+            : busy
+              ? "Submitting…"
+              : "Submit Quote Request"}
         </button>
         <button
           type="button"
+          disabled={busy}
           onClick={handleSaveDraft}
-          className="inline-flex h-11 items-center justify-center whitespace-nowrap rounded-lg border border-[#d0d0d0] bg-white px-5 text-sm font-semibold text-aurora-ink transition-colors hover:bg-[#f7f7f7]"
+          className="inline-flex h-11 items-center justify-center whitespace-nowrap rounded-lg border border-[#d0d0d0] bg-white px-5 text-sm font-semibold text-aurora-ink transition-colors hover:bg-[#f7f7f7] disabled:opacity-60"
         >
-          Save Draft
+          {busy ? "Saving…" : "Save Draft"}
         </button>
       </div>
     </form>

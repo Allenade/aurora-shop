@@ -83,9 +83,10 @@ export type AdminStat = {
 
 export type AdminRecentOrder = {
   id: string;
+  internalId?: string;
   customer: string;
   amount: string;
-  status: "Pending" | "Delivered" | "In Transit";
+  status: "Pending" | "Delivered" | "In Transit" | "Cancelled";
   date: string;
 };
 
@@ -108,6 +109,11 @@ export type OrderBreakdownItem = {
   count: number;
   percent: number;
   tone: "green" | "orange" | "blue" | "gray";
+};
+
+export type AdminGreetingData = {
+  title: string;
+  date: string;
 };
 
 export const ADMIN_GREETING = {
@@ -228,6 +234,7 @@ export type CatalogProduct = {
   minStock: number;
   status: CatalogStatus;
   image: string;
+  images?: string[];
   specs?: string;
 };
 
@@ -236,6 +243,8 @@ export const CATALOG_CATEGORIES = [
   "Sensors",
   "Motors",
   "Powers",
+  "Power Supply",
+  "Displays",
   "Single Board Computers",
 ] as const;
 
@@ -492,7 +501,11 @@ export const INVENTORY_ITEMS: InventoryItem[] = [
 
 export const INVENTORY_TOTAL_COUNT = 12;
 
-export type AdminOrderStatus = "Delivered" | "In Transit" | "Pending";
+export type AdminOrderStatus =
+  | "Delivered"
+  | "In Transit"
+  | "Pending"
+  | "Cancelled";
 
 export type AdminOrderPayment = "Bank Transfer" | "Card";
 
@@ -803,6 +816,7 @@ export type AdminProcurementStatus =
   | "Approved"
   | "Under Review"
   | "Pending"
+  | "Draft"
   | "Rejected";
 
 export type AdminProcurementRequest = {

@@ -8,10 +8,13 @@ import {
   type CatalogProduct,
   type CatalogStatus,
 } from '@/lib/admin';
+import { BffRequestError } from '@/lib/bff/client';
 import { bffCall } from '@/lib/bff/generated/client';
 import { toCatalogProduct } from '@/lib/bff/map';
 import type { ShopProduct } from '@/lib/shop';
 import { cn } from '@/lib/utils';
+
+const PAGE_SIZE = 10;
 
 function statusClasses(status: CatalogStatus) {
   if (status === 'CRITICAL') return 'border-[#f0b4b4] text-[#d64545] bg-[#fff5f5]';
@@ -147,43 +150,142 @@ function ProductRow({
   );
 }
 
+function specsFromText(text?: string) {
+  if (!text?.trim()) return [] as Array<{ label: string; value: string }>;
+  return text
+    .split(';')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const idx = part.indexOf(':');
+      if (idx === -1) return { label: 'Notes', value: part };
+      return {
+        label: part.slice(0, idx).trim() || 'Notes',
+        value: part.slice(idx + 1).trim(),
+      };
+    });
+}
+
+function buildPageItems(current: number, total: number) {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+
+  const pages = new Set<number>([1, total, current]);
+  for (let i = current - 1; i <= current + 1; i += 1) {
+    if (i >= 1 && i <= total) pages.add(i);
+  }
+
+  const sorted = [...pages].sort((a, b) => a - b);
+  const items: Array<number | 'ellipsis'> = [];
+  for (let i = 0; i < sorted.length; i += 1) {
+    const page = sorted[i]!;
+    const prev = sorted[i - 1];
+    if (prev !== undefined && page - prev > 1) items.push('ellipsis');
+    items.push(page);
+  }
+  return items;
+}
+
 const FILTERS = ['All Products', 'In Stock', 'Low Stock', 'Critical', 'Out of Stock'] as const;
+
+type ProductListResponse = {
+  items: Array<ShopProduct & { sku?: string; minStock?: number }>;
+  total: number;
+  page: number;
+  limit: number;
+  pageCount: number;
+};
+
+function statusQueryParam(filter: (typeof FILTERS)[number]) {
+  if (filter === 'In Stock') return 'in_stock';
+  if (filter === 'Low Stock') return 'low_stock';
+  if (filter === 'Critical') return 'critical';
+  if (filter === 'Out of Stock') return 'out_of_stock';
+  return undefined;
+}
 
 export function ProductCatalog() {
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('All Products');
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [pageCount, setPageCount] = useState(1);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [fetchState, setFetchState] = useState<{
+    key: string | null;
+    error: string | null;
+  }>({ key: null, error: null });
+
+  const fetchKey = `${debouncedQuery}\0${filter}\0${page}\0${reloadKey}`;
+  const loading = fetchState.key !== fetchKey;
+  const error = fetchState.key === fetchKey ? fetchState.error : null;
 
   useEffect(() => {
-    void bffCall<Array<ShopProduct & { sku?: string; minStock?: number }>>('listProducts')
-      .then((rows) => {
-        if (Array.isArray(rows)) setProducts(rows.map((row) => toCatalogProduct(row)));
+    const timer = window.setTimeout(() => {
+      setDebouncedQuery(query.trim());
+      setPage(1);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const key = fetchKey;
+
+    void bffCall<ProductListResponse>('listProducts', {
+      query: {
+        q: debouncedQuery || undefined,
+        status: statusQueryParam(filter),
+        page: String(page),
+        limit: String(PAGE_SIZE),
+      },
+    })
+      .then((res) => {
+        if (cancelled) return;
+        const paginated = res && !Array.isArray(res) && Array.isArray(res.items);
+        const items = Array.isArray(res) ? res : paginated ? res.items : [];
+        const nextPageCount = paginated
+          ? Math.max(1, res.pageCount ?? 1)
+          : 1;
+        setProducts(items.map((row) => toCatalogProduct(row)));
+        setTotal(paginated ? (res.total ?? items.length) : items.length);
+        setPageCount(nextPageCount);
+        setFetchState({ key, error: null });
+        setPage((current) => (current > nextPageCount ? nextPageCount : current));
       })
-      .catch(() => undefined);
-  }, []);
+      .catch((err) => {
+        if (cancelled) return;
+        setProducts([]);
+        setTotal(0);
+        setPageCount(1);
+        setFetchState({
+          key,
+          error:
+            err instanceof BffRequestError
+              ? err.message
+              : 'Unable to load products from the API.',
+        });
+      });
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return products.filter((p) => {
-      const matchesQuery =
-        !q ||
-        p.name.toLowerCase().includes(q) ||
-        p.sku.toLowerCase().includes(q) ||
-        p.category.toLowerCase().includes(q);
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchKey, debouncedQuery, filter, page, reloadKey]);
 
-      const matchesFilter =
-        filter === 'All Products' ||
-        (filter === 'In Stock' && p.status === 'IN STOCK') ||
-        (filter === 'Low Stock' && p.status === 'LOW STOCK') ||
-        (filter === 'Critical' && p.status === 'CRITICAL') ||
-        (filter === 'Out of Stock' && p.status === 'OUT OF STOCK');
-
-      return matchesQuery && matchesFilter;
-    });
-  }, [products, query, filter]);
+  const currentPage = Math.min(page, pageCount);
+  const rangeStart = total === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+  const rangeEnd = total === 0 ? 0 : Math.min((currentPage - 1) * PAGE_SIZE + products.length, total);
+  const pagerButtons = useMemo(
+    () => buildPageItems(currentPage, pageCount),
+    [currentPage, pageCount],
+  );
 
   const editingProduct =
     editingId === null ? null : (products.find((product) => product.id === editingId) ?? null);
@@ -194,10 +296,16 @@ export function ProductCatalog() {
   function handleDelete(id: string) {
     void bffCall('deleteProduct', { params: { id } })
       .then(() => {
-        setProducts((prev) => prev.filter((p) => p.id !== id));
         setRemovingId(null);
+        setReloadKey((key) => key + 1);
       })
-      .catch(() => undefined);
+      .catch((err) => {
+        setFetchState((prev) => ({
+          key: prev.key,
+          error:
+            err instanceof BffRequestError ? err.message : 'Unable to delete product.',
+        }));
+      });
   }
 
   function handleSave(next: CatalogProduct) {
@@ -206,6 +314,11 @@ export function ProductCatalog() {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '');
+    const images =
+      Array.isArray(next.images) && next.images.length > 0
+        ? next.images.slice(0, 5)
+        : [next.image || '/images/auth-panel.png'];
+    const image = images[0] || '/images/auth-panel.png';
     const payload = {
       name: next.name,
       subtitle: next.description,
@@ -216,10 +329,11 @@ export function ProductCatalog() {
       quantity: next.stock,
       minStock: next.minStock,
       slug: slug || `product-${Date.now()}`,
-      image: next.image || '/images/auth-panel.png',
-      images: [next.image || '/images/auth-panel.png'],
+      image,
+      images,
+      specs: specsFromText(next.specs ?? next.description),
     };
-    const exists = products.some((product) => product.id === next.id);
+    const exists = Boolean(editingId) && products.some((product) => product.id === next.id);
     const request = exists
       ? bffCall<ShopProduct & { sku?: string; minStock?: number }>('updateProduct', {
           params: { id: next.id },
@@ -229,20 +343,21 @@ export function ProductCatalog() {
           body: payload,
         });
 
+    setSaving(true);
     void request
-      .then((saved) => {
-        const mapped = toCatalogProduct(saved);
-        setProducts((prev) => {
-          const found = prev.some((product) => product.id === mapped.id);
-          if (found) {
-            return prev.map((product) => (product.id === mapped.id ? mapped : product));
-          }
-          return [mapped, ...prev];
-        });
+      .then(() => {
         setEditingId(null);
         setIsAdding(false);
+        setReloadKey((key) => key + 1);
       })
-      .catch(() => undefined);
+      .catch((err) => {
+        setFetchState((prev) => ({
+          key: prev.key,
+          error:
+            err instanceof BffRequestError ? err.message : 'Unable to save product.',
+        }));
+      })
+      .finally(() => setSaving(false));
   }
 
   return (
@@ -252,7 +367,7 @@ export function ProductCatalog() {
           <h1 className="text-[1.75rem] font-bold tracking-tight text-aurora-ink">
             Product Catalog
           </h1>
-          <p className="mt-1 text-sm text-[#8a8a8a]">{products.length} Products in Catalog</p>
+          <p className="mt-1 text-sm text-[#8a8a8a]">{total} Products in Catalog</p>
         </div>
 
         <button
@@ -270,6 +385,20 @@ export function ProductCatalog() {
         </button>
       </div>
 
+      {error ? (
+        <p className="mb-4 rounded-xl border border-[#f0b4b4] bg-[#fff5f5] px-4 py-3 text-sm text-[#d64545]" role="alert">
+          {error}
+        </p>
+      ) : null}
+
+      {loading ? (
+        <p className="mb-4 text-sm text-[#8a8a8a]">Loading products…</p>
+      ) : null}
+
+      {saving ? (
+        <p className="mb-4 text-sm text-[#8a8a8a]">Saving product…</p>
+      ) : null}
+
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative min-w-0 flex-1">
           <span className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-[#9a9a9a]">
@@ -286,14 +415,17 @@ export function ProductCatalog() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search Products or SKU"
+            placeholder="Search products, SKU, category, or description"
             className="h-11 w-full rounded-xl border border-[#e5e5e5] bg-white pr-4 pl-10 text-sm text-aurora-ink outline-none placeholder:text-[#9a9a9a] focus:border-aurora-ink/30"
           />
         </div>
 
         <select
           value={filter}
-          onChange={(e) => setFilter(e.target.value as (typeof FILTERS)[number])}
+          onChange={(e) => {
+            setFilter(e.target.value as (typeof FILTERS)[number]);
+            setPage(1);
+          }}
           className="h-11 rounded-xl border border-[#e5e5e5] bg-white px-3 text-sm font-medium text-aurora-ink outline-none focus:border-aurora-ink/30"
         >
           {FILTERS.map((option) => (
@@ -322,14 +454,14 @@ export function ProductCatalog() {
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 ? (
+              {products.length === 0 && !loading ? (
                 <tr>
                   <td colSpan={7} className="py-16 text-center text-sm text-[#8a8a8a]">
                     No products match this search.
                   </td>
                 </tr>
               ) : (
-                filtered.map((product) => (
+                products.map((product) => (
                   <ProductRow
                     key={product.id}
                     product={product}
@@ -347,39 +479,44 @@ export function ProductCatalog() {
 
         <div className="flex flex-col gap-3 border-t border-[#ececec] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <p className="text-sm text-[#8a8a8a]">
-            Showing 1-{filtered.length} of {products.length} products
+            Showing {rangeStart}-{rangeEnd} of {total} products
           </p>
           <div className="flex flex-wrap items-center gap-1.5">
             <button
               type="button"
-              className="h-9 rounded-lg border border-[#e0e0e0] px-3 text-sm font-medium text-[#6b7280] hover:bg-[#f7f7f7]"
+              disabled={currentPage <= 1}
+              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+              className="h-9 rounded-lg border border-[#e0e0e0] px-3 text-sm font-medium text-[#6b7280] hover:bg-[#f7f7f7] disabled:cursor-not-allowed disabled:opacity-40"
             >
               Previous
             </button>
-            {[1, 2].map((page) => (
-              <button
-                key={page}
-                type="button"
-                className={cn(
-                  'inline-flex size-9 items-center justify-center rounded-lg text-sm font-semibold',
-                  page === 1
-                    ? 'bg-aurora-lime text-aurora-ink'
-                    : 'border border-[#e0e0e0] text-[#6b7280] hover:bg-[#f7f7f7]',
-                )}
-              >
-                {page}
-              </button>
-            ))}
-            <span className="px-1 text-[#9a9a9a]">…</span>
+            {pagerButtons.map((item, index) =>
+              item === 'ellipsis' ? (
+                <span key={`ellipsis-${index}`} className="px-1 text-[#9a9a9a]">
+                  …
+                </span>
+              ) : (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => setPage(item)}
+                  aria-current={item === currentPage ? 'page' : undefined}
+                  className={cn(
+                    'inline-flex size-9 items-center justify-center rounded-lg text-sm font-semibold',
+                    item === currentPage
+                      ? 'bg-aurora-lime text-aurora-ink'
+                      : 'border border-[#e0e0e0] text-[#6b7280] hover:bg-[#f7f7f7]',
+                  )}
+                >
+                  {item}
+                </button>
+              ),
+            )}
             <button
               type="button"
-              className="inline-flex size-9 items-center justify-center rounded-lg border border-[#e0e0e0] text-sm font-semibold text-[#6b7280] hover:bg-[#f7f7f7]"
-            >
-              11
-            </button>
-            <button
-              type="button"
-              className="h-9 rounded-lg border border-[#e0e0e0] bg-white px-3 text-sm font-semibold text-aurora-ink hover:bg-[#f7f7f7]"
+              disabled={currentPage >= pageCount}
+              onClick={() => setPage((prev) => Math.min(pageCount, prev + 1))}
+              className="h-9 rounded-lg border border-[#e0e0e0] bg-white px-3 text-sm font-semibold text-aurora-ink hover:bg-[#f7f7f7] disabled:cursor-not-allowed disabled:opacity-40"
             >
               Next
             </button>

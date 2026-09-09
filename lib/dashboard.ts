@@ -74,58 +74,10 @@ export type RecentOrder = {
   date: string;
   items: number;
   total: string;
-  status: "In Transit" | "Delivered" | "Pending";
+  status: "In Transit" | "Delivered" | "Pending" | "Cancelled";
 };
 
-export const DASHBOARD_STATS: DashboardStat[] = [
-  {
-    id: "total",
-    label: "Total Purchases",
-    value: "123",
-    trend: "+12% from last month",
-    icon: "bag",
-  },
-  {
-    id: "pending",
-    label: "Pending Purchases",
-    value: "13",
-    icon: "clock",
-  },
-  {
-    id: "spent",
-    label: "Total Spent",
-    value: "#457,985",
-    icon: "spend",
-  },
-];
-
-export const RECENT_ORDERS: RecentOrder[] = [
-  {
-    id: "ORD - 2026 - 321",
-    date: "Mar 12, 2026",
-    items: 4,
-    total: "#128,400",
-    status: "In Transit",
-  },
-  {
-    id: "ORD - 2026 - 318",
-    date: "Mar 08, 2026",
-    items: 2,
-    total: "#64,200",
-    status: "Delivered",
-  },
-  {
-    id: "ORD - 2026 - 310",
-    date: "Mar 02, 2026",
-    items: 7,
-    total: "#210,150",
-    status: "Pending",
-  },
-  {
-    id: "ORD - 2026 - 301",
-    date: "Feb 24, 2026",
-    items: 1,
-    total: "#18,900",
-    status: "Delivered",
-  },
-];
+export type BuyerDashboardResponse = {
+  stats: DashboardStat[];
+  recentOrders: RecentOrder[];
+};

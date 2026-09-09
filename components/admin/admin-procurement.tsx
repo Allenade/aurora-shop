@@ -7,16 +7,45 @@ import {
   type AdminProcurementRequest,
   type AdminProcurementStatus,
 } from '@/lib/admin';
+import { BffRequestError } from '@/lib/bff/client';
 import { bffCall } from '@/lib/bff/generated/client';
 import { quoteApiStatus, toAdminProcurement } from '@/lib/bff/map';
 import type { RecentQuote } from '@/lib/procurements';
+import { cn } from '@/lib/utils';
 
-const FILTERS = ['All Requests', 'Approved', 'Under Review', 'Pending', 'Rejected'] as const;
+const PAGE_SIZE = 10;
+const FILTERS = [
+  'All Requests',
+  'Approved',
+  'Under Review',
+  'Pending',
+  'Draft',
+  'Rejected',
+] as const;
+
+type QuotesListResponse = {
+  items: Array<RecentQuote & { internalId?: string }>;
+  total: number;
+  page: number;
+  limit: number;
+  pageCount: number;
+  awaitingReview?: number;
+};
+
+function statusQueryParam(filter: (typeof FILTERS)[number]) {
+  if (filter === 'Approved') return 'approved';
+  if (filter === 'Under Review') return 'under_review';
+  if (filter === 'Pending') return 'pending';
+  if (filter === 'Draft') return 'draft';
+  if (filter === 'Rejected') return 'rejected';
+  return undefined;
+}
 
 function statusTone(status: AdminProcurementStatus) {
   if (status === 'Approved') return 'green' as const;
   if (status === 'Under Review') return 'blue' as const;
   if (status === 'Rejected') return 'red' as const;
+  if (status === 'Draft') return 'gray' as const;
   return 'orange' as const;
 }
 
@@ -94,7 +123,8 @@ function RequestRow({
           <button
             type="button"
             onClick={() => onApprove(request.id)}
-            className="inline-flex size-8 items-center justify-center rounded-lg border border-[#e0e0e0] text-[#6b7280] transition-colors hover:bg-[#f7f7f7] hover:text-aurora-ink"
+            disabled={request.status === 'Approved' || request.status === 'Draft'}
+            className="inline-flex size-8 items-center justify-center rounded-lg border border-[#e0e0e0] text-[#6b7280] transition-colors hover:bg-[#f7f7f7] hover:text-aurora-ink disabled:cursor-not-allowed disabled:opacity-40"
             aria-label={`Approve ${request.id}`}
           >
             <ApproveIcon />
@@ -105,50 +135,132 @@ function RequestRow({
   );
 }
 
+function buildPageItems(current: number, total: number) {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+
+  const pages = new Set<number>([1, total, current]);
+  for (let i = current - 1; i <= current + 1; i += 1) {
+    if (i >= 1 && i <= total) pages.add(i);
+  }
+
+  const sorted = [...pages].sort((a, b) => a - b);
+  const items: Array<number | 'ellipsis'> = [];
+  for (let i = 0; i < sorted.length; i += 1) {
+    const page = sorted[i]!;
+    const prev = sorted[i - 1];
+    if (prev !== undefined && page - prev > 1) items.push('ellipsis');
+    items.push(page);
+  }
+  return items;
+}
+
 export function AdminProcurement() {
   const [requests, setRequests] = useState<AdminProcurementRequest[]>([]);
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('All Requests');
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [pageCount, setPageCount] = useState(1);
+  const [awaitingReview, setAwaitingReview] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [fetchState, setFetchState] = useState<{
+    key: string | null;
+    error: string | null;
+  }>({ key: null, error: null });
+
+  const fetchKey = `${debouncedQuery}\0${filter}\0${page}\0${reloadKey}`;
+  const loading = fetchState.key !== fetchKey;
+  const error = fetchState.key === fetchKey ? fetchState.error : null;
 
   useEffect(() => {
-    void bffCall<Array<RecentQuote & { internalId?: string }>>('listQuotes')
-      .then((rows) => {
-        if (Array.isArray(rows)) setRequests(rows.map((row) => toAdminProcurement(row)));
+    const timer = window.setTimeout(() => {
+      setDebouncedQuery(query.trim());
+      setPage(1);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const key = fetchKey;
+
+    void bffCall<QuotesListResponse>('listQuotes', {
+      query: {
+        q: debouncedQuery || undefined,
+        status: statusQueryParam(filter),
+        page: String(page),
+        limit: String(PAGE_SIZE),
+      },
+    })
+      .then((res) => {
+        if (cancelled) return;
+        const paginated = res && !Array.isArray(res) && Array.isArray(res.items);
+        const rows = Array.isArray(res) ? res : paginated ? res.items : [];
+        const nextPageCount = paginated
+          ? Math.max(1, res.pageCount ?? 1)
+          : 1;
+        setRequests(rows.map((row) => toAdminProcurement(row)));
+        if (paginated) {
+          setTotal(res.total ?? rows.length);
+          setPageCount(nextPageCount);
+          setAwaitingReview(res.awaitingReview ?? 0);
+        } else {
+          setTotal(rows.length);
+          setPageCount(1);
+          setAwaitingReview(
+            rows.filter(
+              (row) => row.status === 'Pending' || row.status === 'Under Review',
+            ).length,
+          );
+        }
+        setFetchState({ key, error: null });
+        setPage((current) => (current > nextPageCount ? nextPageCount : current));
       })
-      .catch(() => undefined);
-  }, []);
+      .catch((err) => {
+        if (cancelled) return;
+        setRequests([]);
+        setTotal(0);
+        setPageCount(1);
+        setAwaitingReview(0);
+        setFetchState({
+          key,
+          error:
+            err instanceof BffRequestError
+              ? err.message
+              : 'Unable to load procurement requests from the API.',
+        });
+      });
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return requests.filter((request) => {
-      const matchesQuery =
-        !q ||
-        request.id.toLowerCase().includes(q) ||
-        request.contact.toLowerCase().includes(q) ||
-        request.email.toLowerCase().includes(q) ||
-        request.items.toLowerCase().includes(q) ||
-        request.institution.toLowerCase().includes(q);
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchKey, debouncedQuery, filter, page, reloadKey]);
 
-      const matchesFilter = filter === 'All Requests' || request.status === filter;
-
-      return matchesQuery && matchesFilter;
-    });
-  }, [requests, query, filter]);
+  const currentPage = Math.min(page, pageCount);
+  const rangeStart = total === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+  const rangeEnd =
+    total === 0 ? 0 : Math.min((currentPage - 1) * PAGE_SIZE + requests.length, total);
+  const pagerButtons = useMemo(
+    () => buildPageItems(currentPage, pageCount),
+    [currentPage, pageCount],
+  );
 
   const selectedRequest =
-    selectedId === null ? null : (requests.find((request) => request.id === selectedId) ?? null);
-
-  const awaitingReview = requests.filter(
-    (request) => request.status === 'Under Review' || request.status === 'Pending',
-  ).length;
+    selectedId === null
+      ? null
+      : (requests.find((request) => request.id === selectedId) ?? null);
 
   function updateStatus(id: string, status: AdminProcurementStatus) {
     const current = requests.find((request) => request.id === id);
     if (!current?.internalId) {
-      setRequests((prev) =>
-        prev.map((request) => (request.id === id ? { ...request, status } : request)),
-      );
+      setFetchState((prev) => ({
+        key: prev.key,
+        error: 'Unable to update quote status — missing internal id.',
+      }));
       return;
     }
     void bffCall('setQuoteStatus', {
@@ -159,8 +271,17 @@ export function AdminProcurement() {
         setRequests((prev) =>
           prev.map((request) => (request.id === id ? { ...request, status } : request)),
         );
+        setReloadKey((key) => key + 1);
       })
-      .catch(() => undefined);
+      .catch((err) => {
+        setFetchState((prev) => ({
+          key: prev.key,
+          error:
+            err instanceof BffRequestError
+              ? err.message
+              : 'Unable to update quote status.',
+        }));
+      });
   }
 
   return (
@@ -178,6 +299,19 @@ export function AdminProcurement() {
           {awaitingReview} Awaiting Review
         </span>
       </div>
+
+      {error ? (
+        <p
+          className="mb-4 rounded-xl border border-[#f0b4b4] bg-[#fff5f5] px-4 py-3 text-sm text-[#d64545]"
+          role="alert"
+        >
+          {error}
+        </p>
+      ) : null}
+
+      {loading ? (
+        <p className="mb-4 text-sm text-[#8a8a8a]">Loading procurement requests…</p>
+      ) : null}
 
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative min-w-0 flex-1">
@@ -202,7 +336,10 @@ export function AdminProcurement() {
 
         <select
           value={filter}
-          onChange={(e) => setFilter(e.target.value as (typeof FILTERS)[number])}
+          onChange={(e) => {
+            setFilter(e.target.value as (typeof FILTERS)[number]);
+            setPage(1);
+          }}
           className="h-11 rounded-xl border border-[#e5e5e5] bg-white px-3 text-sm font-medium text-aurora-ink outline-none focus:border-aurora-ink/30"
         >
           {FILTERS.map((option) => (
@@ -231,14 +368,14 @@ export function AdminProcurement() {
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 ? (
+              {requests.length === 0 && !loading ? (
                 <tr>
                   <td colSpan={7} className="py-16 text-center text-sm text-[#8a8a8a]">
                     No procurement requests match this search.
                   </td>
                 </tr>
               ) : (
-                filtered.map((request) => (
+                requests.map((request) => (
                   <RequestRow
                     key={request.id}
                     request={request}
@@ -249,6 +386,52 @@ export function AdminProcurement() {
               )}
             </tbody>
           </table>
+        </div>
+
+        <div className="flex flex-col gap-3 border-t border-[#ececec] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <p className="text-sm text-[#8a8a8a]">
+            Showing {rangeStart}-{rangeEnd} of {total} requests
+          </p>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              disabled={currentPage <= 1}
+              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+              className="h-9 rounded-lg border border-[#e0e0e0] px-3 text-sm font-medium text-[#6b7280] hover:bg-[#f7f7f7] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Previous
+            </button>
+            {pagerButtons.map((item, index) =>
+              item === 'ellipsis' ? (
+                <span key={`ellipsis-${index}`} className="px-1 text-[#9a9a9a]">
+                  …
+                </span>
+              ) : (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => setPage(item)}
+                  aria-current={item === currentPage ? 'page' : undefined}
+                  className={cn(
+                    'inline-flex size-9 items-center justify-center rounded-lg text-sm font-semibold',
+                    item === currentPage
+                      ? 'bg-aurora-lime text-aurora-ink'
+                      : 'border border-[#e0e0e0] text-[#6b7280] hover:bg-[#f7f7f7]',
+                  )}
+                >
+                  {item}
+                </button>
+              ),
+            )}
+            <button
+              type="button"
+              disabled={currentPage >= pageCount}
+              onClick={() => setPage((prev) => Math.min(pageCount, prev + 1))}
+              className="h-9 rounded-lg bg-aurora-lime px-3 text-sm font-semibold text-aurora-ink transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
         </div>
       </div>
 

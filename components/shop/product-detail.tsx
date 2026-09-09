@@ -19,7 +19,11 @@ export function ProductDetail({ product }: { product: ShopProduct }) {
       {/* Gallery + buy info — no heavy outer card; borders on inner pieces */}
       <div className="grid gap-8 lg:grid-cols-2">
         <ProductGallery
-          images={product.images}
+          images={
+            product.images?.length
+              ? product.images.slice(0, 5)
+              : [product.image]
+          }
           alt={product.name}
           inStock={product.stockStatus !== "out_of_stock"}
         />

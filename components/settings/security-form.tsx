@@ -6,6 +6,7 @@ import {
   Field,
   TextInput,
 } from "@/components/auth/form-controls";
+import { BffRequestError } from "@/lib/bff/client";
 import { bffCall } from "@/lib/bff/generated/client";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +17,7 @@ type PasswordFieldProps = {
   placeholder: string;
   error?: string;
   visible: boolean;
+  disabled?: boolean;
   onToggle: () => void;
   onChange: (value: string) => void;
 };
@@ -27,6 +29,7 @@ function PasswordField({
   placeholder,
   error,
   visible,
+  disabled,
   onToggle,
   onChange,
 }: PasswordFieldProps) {
@@ -40,14 +43,16 @@ function PasswordField({
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
           invalid={Boolean(error)}
+          disabled={disabled}
           className="pr-11"
           autoComplete="off"
         />
         <button
           type="button"
           onClick={onToggle}
+          disabled={disabled}
           className={cn(
-            "absolute top-1/2 right-3 -translate-y-1/2 text-[#8a8a8a] transition-colors hover:text-aurora-ink",
+            "absolute top-1/2 right-3 -translate-y-1/2 text-[#8a8a8a] transition-colors hover:text-aurora-ink disabled:opacity-50",
           )}
           aria-label={visible ? "Hide password" : "Show password"}
           aria-pressed={visible}
@@ -79,6 +84,8 @@ export function SecurityForm() {
     confirm: false,
   });
   const [errors, setErrors] = useState<Partial<SecurityFormState>>({});
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
 
   function update<K extends keyof SecurityFormState>(
@@ -87,6 +94,14 @@ export function SecurityForm() {
   ) {
     setForm((prev) => ({ ...prev, [key]: value }));
     if (savedMessage) setSavedMessage(null);
+    if (error) setError(null);
+    if (errors[key]) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+    }
   }
 
   function validate() {
@@ -111,7 +126,10 @@ export function SecurityForm() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSavedMessage(null);
+    setError(null);
     if (!validate()) return;
+
+    setSaving(true);
     void bffCall("updateSettingsPassword", {
       body: {
         currentPassword: form.currentPassword,
@@ -121,9 +139,17 @@ export function SecurityForm() {
       .then(() => {
         setSavedMessage("Password updated successfully.");
         setForm(INITIAL);
+        setErrors({});
         setVisible({ current: false, next: false, confirm: false });
       })
-      .catch(() => setSavedMessage("Could not update password."));
+      .catch((err) => {
+        setError(
+          err instanceof BffRequestError
+            ? err.message
+            : "Could not update password.",
+        );
+      })
+      .finally(() => setSaving(false));
   }
 
   return (
@@ -141,6 +167,7 @@ export function SecurityForm() {
             placeholder="Enter current password"
             error={errors.currentPassword}
             visible={visible.current}
+            disabled={saving}
             onToggle={() =>
               setVisible((prev) => ({ ...prev, current: !prev.current }))
             }
@@ -154,6 +181,7 @@ export function SecurityForm() {
             placeholder="Enter new password"
             error={errors.newPassword}
             visible={visible.next}
+            disabled={saving}
             onToggle={() =>
               setVisible((prev) => ({ ...prev, next: !prev.next }))
             }
@@ -167,6 +195,7 @@ export function SecurityForm() {
             placeholder="Confirm new password"
             error={errors.confirmPassword}
             visible={visible.confirm}
+            disabled={saving}
             onToggle={() =>
               setVisible((prev) => ({ ...prev, confirm: !prev.confirm }))
             }
@@ -174,6 +203,15 @@ export function SecurityForm() {
           />
         </div>
       </div>
+
+      {error ? (
+        <p
+          className="mt-4 rounded-xl border border-[#f0b4b4] bg-[#fff5f5] px-4 py-3 text-sm text-[#d64545]"
+          role="alert"
+        >
+          {error}
+        </p>
+      ) : null}
 
       {savedMessage ? (
         <p className="mt-4 text-sm font-medium text-[#1f9d57]" role="status">
@@ -184,9 +222,10 @@ export function SecurityForm() {
       <div className="mt-6">
         <button
           type="submit"
-          className="inline-flex h-11 items-center justify-center whitespace-nowrap rounded-lg bg-aurora-lime px-5 text-sm font-semibold text-aurora-ink transition-opacity hover:opacity-90"
+          disabled={saving}
+          className="inline-flex h-11 items-center justify-center whitespace-nowrap rounded-lg bg-aurora-lime px-5 text-sm font-semibold text-aurora-ink transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Update Password
+          {saving ? "Updating…" : "Update Password"}
         </button>
       </div>
     </form>

@@ -22,9 +22,18 @@ export class AuthError extends Error {
 }
 
 type NestError = {
-  message?: string;
+  message?: string | string[];
   statusCode?: number;
 };
+
+function nestErrorMessage(body: NestError | null, fallback: string) {
+  const message = body?.message;
+  if (Array.isArray(message)) {
+    return message.filter(Boolean).join(", ") || fallback;
+  }
+  if (typeof message === "string" && message.trim()) return message;
+  return fallback;
+}
 
 async function parseJson<T>(res: Response): Promise<T | null> {
   try {
@@ -104,7 +113,7 @@ export async function nestFetch<T>(
   const body = await parseJson<T & NestError>(res);
   if (!res.ok) {
     throw new AuthError(
-      body?.message ?? "Request failed",
+      nestErrorMessage(body, "Request failed"),
       body?.statusCode ?? res.status,
     );
   }
