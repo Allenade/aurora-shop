@@ -7,6 +7,7 @@ function isPublicPath(pathname: string) {
   if (pathname.startsWith("/api/auth/login")) return true;
   if (pathname.startsWith("/api/auth/register")) return true;
   if (pathname.startsWith("/api/auth/verify")) return true;
+  if (pathname.startsWith("/api/auth/resend")) return true;
   if (pathname.startsWith("/api/auth/logout")) return true;
   if (pathname.startsWith("/_next")) return true;
   if (pathname.startsWith("/images")) return true;

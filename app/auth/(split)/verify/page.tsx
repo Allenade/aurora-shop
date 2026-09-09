@@ -11,7 +11,11 @@ import {
 } from "react";
 import { AuroraLogo } from "@/components/auth/aurora-logo";
 import { AuthButton } from "@/components/auth/form-controls";
-import { verifyOtpRequest } from "@/lib/bff/client";
+import {
+  BffRequestError,
+  resendOtpRequest,
+  verifyOtpRequest,
+} from "@/lib/bff/client";
 
 const OTP_LENGTH = 6;
 
@@ -33,9 +37,13 @@ function EnvelopeIcon() {
 function VerifyForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const email = searchParams.get("email") || "your email";
+  const emailParam = searchParams.get("email")?.trim() ?? "";
+  const email = emailParam || "your email";
   const [digits, setDigits] = useState<string[]>(Array(OTP_LENGTH).fill(""));
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const [resending, setResending] = useState(false);
   const inputsRef = useRef<Array<HTMLInputElement | null>>([]);
 
   useEffect(() => {
@@ -49,6 +57,7 @@ function VerifyForm() {
       next[index] = char;
       return next;
     });
+    if (error) setError("");
     if (char && index < OTP_LENGTH - 1) {
       inputsRef.current[index + 1]?.focus();
     }
@@ -71,22 +80,61 @@ function VerifyForm() {
       .fill("")
       .map((_, i) => pasted[i] ?? "");
     setDigits(next);
+    setError("");
     inputsRef.current[Math.min(pasted.length, OTP_LENGTH - 1)]?.focus();
   };
 
   const onVerify = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!emailParam) {
+      setError("Missing email. Go back and sign up again.");
+      return;
+    }
     if (digits.join("").length !== OTP_LENGTH) {
       setError("Enter the 6-digit verification code");
       return;
     }
     setError("");
+    setInfo("");
+    setVerifying(true);
     try {
-      await verifyOtpRequest(email, digits.join(""));
-      router.push(`/auth/success?email=${encodeURIComponent(email)}`);
+      const result = await verifyOtpRequest(emailParam, digits.join(""));
+      const redirectTo = result.redirectTo || "/dashboard";
+      router.push(
+        `/auth/success?email=${encodeURIComponent(emailParam)}&next=${encodeURIComponent(redirectTo)}`,
+      );
       router.refresh();
-    } catch {
-      setError("Could not complete verification. Try again.");
+    } catch (err) {
+      setDigits(Array(OTP_LENGTH).fill(""));
+      inputsRef.current[0]?.focus();
+      setError(
+        err instanceof BffRequestError
+          ? err.message
+          : "Could not complete verification. Try again.",
+      );
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const onResend = async () => {
+    if (!emailParam || resending || verifying) return;
+    setError("");
+    setInfo("");
+    setResending(true);
+    try {
+      await resendOtpRequest(emailParam);
+      setDigits(Array(OTP_LENGTH).fill(""));
+      inputsRef.current[0]?.focus();
+      setInfo("A new code was sent. Check your email (or server logs in dev).");
+    } catch (err) {
+      setError(
+        err instanceof BffRequestError
+          ? err.message
+          : "Unable to resend code. Try again.",
+      );
+    } finally {
+      setResending(false);
     }
   };
 
@@ -126,11 +174,12 @@ function VerifyForm() {
                   autoComplete={index === 0 ? "one-time-code" : "off"}
                   maxLength={1}
                   value={digits[index]}
+                  disabled={verifying}
                   aria-label={`Digit ${index + 1}`}
                   onChange={(e) => setDigit(index, e.target.value)}
                   onKeyDown={(e) => onKeyDown(index, e)}
                   onPaste={onPaste}
-                  className={`size-11 shrink-0 rounded-md border text-center text-lg font-semibold outline-none sm:size-12 ${
+                  className={`size-11 shrink-0 rounded-md border text-center text-lg font-semibold outline-none sm:size-12 disabled:opacity-60 ${
                     digits[index]
                       ? "border-aurora-lime bg-aurora-lime text-aurora-ink"
                       : "border-[#d9d9d9] bg-white text-aurora-ink"
@@ -151,11 +200,12 @@ function VerifyForm() {
                   autoComplete="off"
                   maxLength={1}
                   value={digits[index]}
+                  disabled={verifying}
                   aria-label={`Digit ${index + 1}`}
                   onChange={(e) => setDigit(index, e.target.value)}
                   onKeyDown={(e) => onKeyDown(index, e)}
                   onPaste={onPaste}
-                  className={`size-11 shrink-0 rounded-md border text-center text-lg font-semibold outline-none sm:size-12 ${
+                  className={`size-11 shrink-0 rounded-md border text-center text-lg font-semibold outline-none sm:size-12 disabled:opacity-60 ${
                     digits[index]
                       ? "border-aurora-lime bg-aurora-lime text-aurora-ink"
                       : "border-[#d9d9d9] bg-white text-aurora-ink"
@@ -168,17 +218,28 @@ function VerifyForm() {
                 {error}
               </p>
             ) : null}
+            {info && !error ? (
+              <p className="mt-2 text-sm text-[#1f9d57]" role="status">
+                {info}
+              </p>
+            ) : null}
           </div>
 
           <div className="flex gap-3">
             <AuthButton
               variant="outline"
+              disabled={verifying || resending}
               onClick={() => router.push("/auth/signup")}
             >
               Back to Sign Up
             </AuthButton>
-            <AuthButton type="submit" variant="lime" className="flex-1">
-              Verify & Continue
+            <AuthButton
+              type="submit"
+              variant="lime"
+              className="flex-1"
+              disabled={verifying || resending}
+            >
+              {verifying ? "Verifying…" : "Verify & Continue"}
             </AuthButton>
           </div>
 
@@ -186,9 +247,11 @@ function VerifyForm() {
             Didn&apos;t receive the code?{" "}
             <button
               type="button"
-              className="font-semibold text-aurora-ink underline-offset-2 hover:underline"
+              disabled={verifying || resending || !emailParam}
+              onClick={() => void onResend()}
+              className="font-semibold text-aurora-ink underline-offset-2 hover:underline disabled:opacity-50"
             >
-              Resend Code
+              {resending ? "Sending…" : "Resend Code"}
             </button>
           </p>
         </form>
