@@ -1,10 +1,21 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { bffCall } from "@/lib/bff/generated/client";
+import { useCart } from "@/lib/cart-store";
 import {
   formatProductSummary,
   type OrderRecord,
   type OrderStatus,
 } from "@/lib/orders";
+import {
+  formatMergeNotices,
+  reorderLinesFromOrder,
+  saveReorderNotices,
+} from "@/lib/reorder";
 
 function statusTone(status: OrderStatus) {
   if (status === "Delivered") return "green" as const;
@@ -60,15 +71,49 @@ function MetaIcon({ type }: { type: "date" | "items" | "ref" }) {
 }
 
 export function OrderRow({ order }: { order: OrderRecord }) {
-  const secondaryAction =
-    order.status === "Delivered"
-      ? { label: "Re-order", href: "/shop" }
-      : order.status === "Cancelled"
-        ? null
-        : {
-            label: "Track Order",
-            href: `/track-orders?q=${encodeURIComponent(order.trackingNumber)}`,
-          };
+  const router = useRouter();
+  const cart = useCart();
+  const [busy, setBusy] = useState(false);
+  const [notices, setNotices] = useState<string[]>([]);
+
+  async function handleReorder() {
+    if (busy) return;
+    try {
+      setBusy(true);
+      setNotices([]);
+      let source = order;
+      let lines = reorderLinesFromOrder(source);
+      if (lines.length === 0) {
+        source = await bffCall<OrderRecord>("getOrder", {
+          params: { id: order.id },
+        });
+        lines = reorderLinesFromOrder(source);
+      }
+      if (lines.length === 0) {
+        setNotices(["This order has no products that can be re-ordered."]);
+        return;
+      }
+
+      const result = await cart.mergeItems(lines);
+      const nextNotices = formatMergeNotices(result);
+      if (!result.addedAny) {
+        setNotices(
+          nextNotices.length > 0
+            ? nextNotices
+            : ["None of the items from this order could be added to your cart."],
+        );
+        return;
+      }
+      saveReorderNotices(nextNotices);
+      router.push("/cart");
+    } catch (err) {
+      setNotices([
+        err instanceof Error ? err.message : "Unable to add items to cart.",
+      ]);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <div className="flex flex-col gap-4 py-5 sm:flex-row sm:items-center sm:justify-between sm:gap-8">
@@ -105,15 +150,35 @@ export function OrderRow({ order }: { order: OrderRecord }) {
           >
             View Details
           </Link>
-          {secondaryAction ? (
+          {order.status === "Delivered" ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void handleReorder()}
+              className="inline-flex h-9 items-center justify-center whitespace-nowrap rounded-lg border border-[#d0d0d0] bg-white px-3.5 text-sm font-semibold text-aurora-ink transition-colors hover:bg-[#f7f7f7] disabled:opacity-60"
+            >
+              {busy ? "Adding…" : "Re-order"}
+            </button>
+          ) : order.status !== "Cancelled" ? (
             <Link
-              href={secondaryAction.href}
+              href={`/track-orders?q=${encodeURIComponent(order.trackingNumber)}`}
               className="inline-flex h-9 items-center justify-center whitespace-nowrap rounded-lg border border-[#d0d0d0] bg-white px-3.5 text-sm font-semibold text-aurora-ink transition-colors hover:bg-[#f7f7f7]"
             >
-              {secondaryAction.label}
+              Track Order
             </Link>
           ) : null}
         </div>
+
+        {notices.length > 0 ? (
+          <ul
+            className="mt-3 space-y-1 rounded-lg border border-[#f0d9a8] bg-[#fff8eb] px-3 py-2 text-xs text-[#8a5a00]"
+            role="status"
+          >
+            {notices.map((notice) => (
+              <li key={notice}>{notice}</li>
+            ))}
+          </ul>
+        ) : null}
       </div>
 
       <p className="shrink-0 text-lg font-bold whitespace-nowrap text-aurora-ink sm:self-center sm:text-right sm:text-xl">

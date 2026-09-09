@@ -125,6 +125,14 @@ export async function upstreamVerifyOtp(email: string, code: string) {
   });
 }
 
+export async function upstreamResendOtp(email: string) {
+  return nestFetch<{ ok: true; email: string }>("/auth/otp/resend", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+    session: null,
+  });
+}
+
 export async function upstreamLogout(session: SessionPayload | null) {
   if (!session?.accessToken || getAuthMode() !== "upstream") return { ok: true };
   try {

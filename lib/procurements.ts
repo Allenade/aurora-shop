@@ -51,6 +51,7 @@ export function createDraftQuote(
 ): RecentQuote {
   return {
     id: existing?.status === "Draft" ? existing.id : createQuoteReferenceId(),
+    internalId: existing?.internalId,
     title: quoteTitleFromForm(form),
     status: "Draft",
     amount: formatQuoteAmount(form.budget),
@@ -69,6 +70,8 @@ export function createDraftQuote(
 
 export type RecentQuote = {
   id: string;
+  /** UUID used for update / admin status APIs */
+  internalId?: string;
   title: string;
   status: QuoteStatus;
   amount: string;

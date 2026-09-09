@@ -60,6 +60,11 @@ function HighlightIcon({ icon }: { icon: (typeof HIGHLIGHTS)[number]["icon"] }) 
 function SuccessContent() {
   const searchParams = useSearchParams();
   const email = searchParams.get("email") || "your account";
+  const nextRaw = searchParams.get("next")?.trim() || "/dashboard";
+  const dashboardHref =
+    nextRaw.startsWith("/") && !nextRaw.startsWith("//")
+      ? nextRaw
+      : "/dashboard";
 
   return (
     <div className="flex min-h-dvh w-full flex-col items-center justify-center bg-white px-6 py-12">
@@ -101,7 +106,7 @@ function SuccessContent() {
 
         <div className="mt-8 flex w-full flex-col gap-3 sm:flex-row">
           <Link
-            href="/dashboard"
+            href={dashboardHref}
             className="inline-flex h-12 flex-1 items-center justify-center rounded-md border border-[#d9d9d9] bg-white text-[15px] font-semibold text-aurora-ink transition-colors hover:bg-[#f7f7f7]"
           >
             Go to Dashboard

@@ -18,13 +18,11 @@ import {
   type DeliveryMethodId,
   type PaymentMethodId,
 } from "@/lib/cart";
+import { useCart, type CartItem } from "@/lib/cart-store";
 import { Action, Resource, RequirePermission } from "@/lib/permissions";
-import {
-  getDefaultProduct,
-  getProductBySlug,
-  type ShopProduct,
-} from "@/lib/shop";
+import type { ShopProduct } from "@/lib/shop";
 import { bffCall } from "@/lib/bff/generated/client";
+import { readReorderNotices } from "@/lib/reorder";
 
 function PlaceOrderIcon() {
   return (
@@ -41,6 +39,29 @@ function PlaceOrderIcon() {
   );
 }
 
+function cartItemToProduct(item: CartItem): ShopProduct {
+  return {
+    id: item.productId,
+    slug: item.slug,
+    name: item.name,
+    subtitle: "",
+    category: "",
+    brand: "",
+    subcategory: "",
+    price: item.price,
+    priceLabel: item.priceLabel,
+    unitLabel: "Per unit",
+    stockStatus: item.stockCount > 0 ? "in_stock" : "out_of_stock",
+    stockCount: item.stockCount,
+    image: item.image,
+    images: [item.image],
+    highlights: [],
+    specs: [],
+    datasheetNote: "",
+    reviewsNote: "",
+  };
+}
+
 type CartLine = {
   product: ShopProduct;
   qty: number;
@@ -50,16 +71,20 @@ type CheckoutPhase = "delivery" | "review" | "bank" | "card" | "success";
 
 function CheckoutPageContent() {
   const searchParams = useSearchParams();
-  const addSlug = searchParams.get("add");
+  const buySlug = searchParams.get("buy");
+  const cart = useCart();
 
-  const initialLines = useMemo<CartLine[]>(() => {
-    const added = addSlug ? getProductBySlug(addSlug) : null;
-    if (added) return [{ product: added, qty: 1 }];
-    return [{ product: getDefaultProduct(), qty: 1 }];
-  }, [addSlug]);
+  const lines = useMemo<CartLine[]>(() => {
+    const items = cart.items.map((item) => ({
+      product: cartItemToProduct(item),
+      qty: item.qty,
+    }));
+    if (!buySlug) return items;
+    const preferred = items.find((line) => line.product.slug === buySlug);
+    return preferred ? [preferred] : items;
+  }, [cart.items, buySlug]);
 
   const [phase, setPhase] = useState<CheckoutPhase>("delivery");
-  const [lines, setLines] = useState(initialLines);
   const [form, setForm] = useState<DeliveryFormState>(INITIAL_DELIVERY_FORM);
   const [errors, setErrors] = useState<
     Partial<Record<keyof DeliveryFormState, string>>
@@ -78,6 +103,15 @@ function CheckoutPageContent() {
     accountName: string;
     accountNumber: string;
   } | null>(null);
+  const [reorderNotices, setReorderNotices] = useState<string[]>([]);
+
+  useEffect(() => {
+    // sessionStorage is client-only; defer so we don't sync-set in the effect body
+    const id = window.setTimeout(() => {
+      setReorderNotices(readReorderNotices());
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, []);
 
   const delivery =
     DELIVERY_METHODS.find((m) => m.id === deliveryId) ?? DELIVERY_METHODS[0]!;
@@ -94,12 +128,13 @@ function CheckoutPageContent() {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  useEffect(() => {
-    if (!addSlug) return;
-    void bffCall<ShopProduct>("getProductBySlug", { params: { slug: addSlug } })
-      .then((product) => setLines([{ product, qty: 1 }]))
-      .catch(() => undefined);
-  }, [addSlug]);
+  function clearPurchasedItems() {
+    if (buySlug) {
+      void cart.remove(buySlug);
+      return;
+    }
+    void cart.clear();
+  }
 
   useEffect(() => {
     const payRef = searchParams.get("pay");
@@ -116,8 +151,10 @@ function CheckoutPageContent() {
         setOrderId(payRef);
         setTrackingNumber(payRef);
         setPhase("success");
+        clearPurchasedItems();
       })
       .catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per pay callback
   }, [searchParams]);
 
   async function placeOrderOnServer() {
@@ -177,10 +214,12 @@ function CheckoutPageContent() {
     setOrderId(nextOrderId);
     setTrackingNumber(nextTracking ?? trackingNumber ?? nextOrderId);
     setPhase("success");
+    clearPurchasedItems();
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function handleContinue() {
+    if (lines.length === 0) return;
     if (phase === "delivery") {
       if (!validate()) return;
       setPhase("review");
@@ -226,6 +265,14 @@ function CheckoutPageContent() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  if (cart.loading) {
+    return (
+      <div className="mx-auto w-full max-w-6xl py-10 text-sm text-[#8a8a8a]">
+        Loading cart…
+      </div>
+    );
+  }
+
   if (phase === "success" && orderId && trackingNumber) {
     return (
       <OrderPlacedSuccess
@@ -239,6 +286,27 @@ function CheckoutPageContent() {
     );
   }
 
+  if (lines.length === 0) {
+    return (
+      <div className="mx-auto w-full max-w-6xl py-10">
+        <div className="mb-5">
+          <h1 className="text-[1.75rem] font-bold tracking-tight text-aurora-ink">
+            Checkout
+          </h1>
+        </div>
+        <p className="text-sm text-[#8a8a8a]">
+          No items in cart.{" "}
+          <Link
+            href="/shop"
+            className="font-semibold text-aurora-ink underline"
+          >
+            Browse shop
+          </Link>
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto w-full max-w-6xl">
       <div className="mb-5">
@@ -249,6 +317,27 @@ function CheckoutPageContent() {
           Complete your order below.
         </p>
       </div>
+
+      {reorderNotices.length > 0 ? (
+        <div
+          className="mb-4 rounded-xl border border-[#f0d9a8] bg-[#fff8eb] px-4 py-3 text-sm text-[#8a5a00]"
+          role="status"
+        >
+          <p className="font-semibold text-aurora-ink">Re-order notes</p>
+          <ul className="mt-1.5 list-disc space-y-1 pl-5">
+            {reorderNotices.map((notice) => (
+              <li key={notice}>{notice}</li>
+            ))}
+          </ul>
+          <button
+            type="button"
+            onClick={() => setReorderNotices([])}
+            className="mt-2 text-xs font-semibold text-aurora-ink underline"
+          >
+            Dismiss
+          </button>
+        </div>
+      ) : null}
 
       <div className="mb-6">
         <CheckoutSteps step={step} />
@@ -374,26 +463,14 @@ function CheckoutPageContent() {
           ) : null}
         </div>
       </div>
-
-      {lines.length === 0 ? (
-        <div className="mt-6 text-center text-sm text-[#8a8a8a]">
-          No items in cart.{" "}
-          <Link
-            href="/shop"
-            className="font-semibold text-aurora-ink underline"
-          >
-            Browse shop
-          </Link>
-        </div>
-      ) : null}
     </div>
   );
 }
 
 function CheckoutPageInner() {
   const searchParams = useSearchParams();
-  const addSlug = searchParams.get("add") ?? "";
-  return <CheckoutPageContent key={addSlug} />;
+  const buySlug = searchParams.get("buy") ?? "";
+  return <CheckoutPageContent key={buySlug} />;
 }
 
 export function CheckoutPage() {

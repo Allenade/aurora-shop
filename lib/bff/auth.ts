@@ -41,8 +41,10 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
   try {
     return await upstreamCurrentUser(session);
   } catch (error) {
+    // Return null on auth failure. Do not clear the cookie here — layouts run
+    // as Server Components, and Next.js only allows cookie writes in Route
+    // Handlers / Server Actions. Login/logout routes own cookie mutation.
     if (error instanceof AuthError && error.status === 401) {
-      await clearSessionCookie();
       return null;
     }
     throw error;

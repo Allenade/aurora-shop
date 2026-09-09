@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 function statusTone(status: TrackStatus) {
   if (status === "Delivered") return "green" as const;
   if (status === "Processing") return "orange" as const;
+  if (status === "Cancelled") return "red" as const;
   if (status === "Out for Delivery") return "blue" as const;
   return "blue" as const;
 }
@@ -53,6 +54,8 @@ export function TrackOrderResult({ shipment }: TrackOrderResultProps) {
         {shipment.timeline.map((step, index) => {
           const isLast = index === shipment.timeline.length - 1;
           const done = step.status === "done";
+          const current = step.status === "current";
+          const active = done || current;
 
           return (
             <li key={step.id} className="relative flex gap-3.5 pb-6 last:pb-0">
@@ -69,9 +72,9 @@ export function TrackOrderResult({ shipment }: TrackOrderResultProps) {
               <span
                 className={cn(
                   "relative z-10 flex size-6 shrink-0 items-center justify-center rounded-full",
-                  done
-                    ? "bg-[#dcfce7] text-[#16a34a]"
-                    : "border-2 border-[#d4d4d4] bg-white",
+                  done && "bg-[#dcfce7] text-[#16a34a]",
+                  current && "border-2 border-[#86efac] bg-white",
+                  !active && "border-2 border-[#d4d4d4] bg-white",
                 )}
               >
                 {done ? (
@@ -91,6 +94,9 @@ export function TrackOrderResult({ shipment }: TrackOrderResultProps) {
                     />
                   </svg>
                 ) : null}
+                {current ? (
+                  <span className="size-2 rounded-full bg-[#16a34a]" />
+                ) : null}
               </span>
 
               <div className="flex min-w-0 flex-1 items-start justify-between gap-4 pt-0.5">
@@ -98,7 +104,7 @@ export function TrackOrderResult({ shipment }: TrackOrderResultProps) {
                   <p
                     className={cn(
                       "text-sm font-semibold",
-                      done ? "text-aurora-ink" : "text-[#9a9a9a]",
+                      active ? "text-aurora-ink" : "text-[#9a9a9a]",
                     )}
                   >
                     {step.label}

@@ -8,7 +8,6 @@ import type {
   CatalogStatus,
   InventoryItem,
 } from "@/lib/admin";
-import { resolveInventoryStatus } from "@/lib/admin";
 import type { OrderRecord } from "@/lib/orders";
 import type { RecentQuote } from "@/lib/procurements";
 import type { ShopProduct } from "@/lib/shop";
@@ -27,6 +26,12 @@ export function toCatalogProduct(
   product: ShopProduct & { sku?: string; minStock?: number },
 ): CatalogProduct {
   const minStock = product.minStock ?? 5;
+  const images =
+    Array.isArray(product.images) && product.images.length > 0
+      ? product.images.slice(0, 5)
+      : product.image
+        ? [product.image]
+        : [];
   return {
     id: product.id,
     name: product.name,
@@ -37,7 +42,8 @@ export function toCatalogProduct(
     stock: product.stockCount,
     minStock,
     status: catalogStatusFromStock(product.stockCount, minStock),
-    image: product.image,
+    image: images[0] ?? product.image,
+    images,
     specs: product.specs?.map((spec) => `${spec.label}: ${spec.value}`).join("; "),
   };
 }
@@ -55,8 +61,7 @@ export function toInventoryItem(row: {
   lastRestocked?: string;
 }): InventoryItem {
   const stock = row.quantity ?? row.stockCount ?? 0;
-  const min = row.minStock ?? 5;
-  const capacity = Math.max(min * 4, stock, 20);
+  const minStock = row.minStock ?? 5;
   return {
     id: row.id,
     name: row.name,
@@ -65,9 +70,9 @@ export function toInventoryItem(row: {
     category: row.category,
     image: row.image,
     stock,
-    capacity,
+    capacity: minStock,
     lastRestocked: row.lastRestocked ?? "—",
-    status: resolveInventoryStatus(stock, capacity),
+    status: catalogStatusFromStock(stock, minStock),
   };
 }
 
@@ -85,7 +90,9 @@ export function toAdminOrder(
       ? "In Transit"
       : order.status === "Delivered"
         ? "Delivered"
-        : "Pending";
+        : order.status === "Cancelled"
+          ? "Cancelled"
+          : "Pending";
   return {
     id: order.id,
     internalId: order.internalId,
@@ -111,7 +118,9 @@ export function toAdminProcurement(
         ? "Under Review"
         : quote.status === "Rejected"
           ? "Rejected"
-          : "Pending";
+          : quote.status === "Draft"
+            ? "Draft"
+            : "Pending";
   return {
     id: quote.id,
     internalId: quote.internalId,
@@ -168,6 +177,7 @@ export function toAdminUser(row: {
 export function fulfillmentStatus(status: AdminOrderStatus) {
   if (status === "In Transit") return "in_transit";
   if (status === "Delivered") return "delivered";
+  if (status === "Cancelled") return "cancelled";
   return "pending";
 }
 
@@ -175,5 +185,6 @@ export function quoteApiStatus(status: AdminProcurementStatus) {
   if (status === "Approved") return "approved";
   if (status === "Under Review") return "under_review";
   if (status === "Rejected") return "rejected";
+  if (status === "Draft") return "draft";
   return "pending";
 }

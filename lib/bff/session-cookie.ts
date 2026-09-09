@@ -53,29 +53,46 @@ export async function readSessionCookie(): Promise<SessionPayload | null> {
   return unsealSession(raw);
 }
 
+function isCookieMutationForbidden(error: unknown) {
+  return (
+    error instanceof Error &&
+    error.message.includes("Cookies can only be modified")
+  );
+}
+
 export async function writeSessionCookie(
   token: string,
   maxAgeSec: number,
 ): Promise<void> {
-  const jar = await cookies();
-  jar.set(SESSION_COOKIE, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: maxAgeSec,
-  });
+  try {
+    const jar = await cookies();
+    jar.set(SESSION_COOKIE, token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: maxAgeSec,
+    });
+  } catch (error) {
+    if (isCookieMutationForbidden(error)) return;
+    throw error;
+  }
 }
 
 export async function clearSessionCookie(): Promise<void> {
-  const jar = await cookies();
-  jar.set(SESSION_COOKIE, "", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: 0,
-  });
+  try {
+    const jar = await cookies();
+    jar.set(SESSION_COOKIE, "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 0,
+    });
+  } catch (error) {
+    if (isCookieMutationForbidden(error)) return;
+    throw error;
+  }
 }
 
 export function sessionMaxAge(rememberMe?: boolean) {

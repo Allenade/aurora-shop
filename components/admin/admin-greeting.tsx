@@ -1,12 +1,19 @@
-import { ADMIN_GREETING } from "@/lib/admin";
+import type { AdminGreetingData } from "@/lib/admin";
 
-export function AdminGreeting() {
+type AdminGreetingProps = {
+  greeting?: AdminGreetingData;
+};
+
+export function AdminGreeting({ greeting }: AdminGreetingProps) {
+  const title = greeting?.title ?? "Welcome back";
+  const date = greeting?.date ?? "";
+
   return (
     <div>
       <h1 className="text-[1.75rem] font-bold tracking-tight text-aurora-ink">
-        {ADMIN_GREETING.title}
+        {title}
       </h1>
-      <p className="mt-1 text-sm text-[#8a8a8a]">{ADMIN_GREETING.date}</p>
+      {date ? <p className="mt-1 text-sm text-[#8a8a8a]">{date}</p> : null}
     </div>
   );
 }

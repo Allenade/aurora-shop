@@ -92,6 +92,13 @@ export function verifyOtpRequest(email: string, code: string) {
   });
 }
 
+export function resendOtpRequest(email: string) {
+  return bffFetch<{ ok: true; email: string }>("/api/auth/resend", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
 export function apiGet<T>(path: string) {
   return bffFetch<T>(`/api/bff${path}`);
 }

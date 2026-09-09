@@ -177,9 +177,7 @@ function SignInForm() {
             </p>
 
             <p className="mt-4 text-center text-xs leading-relaxed text-[#8a8a8a]">
-              Mock auth: any password (4+ chars). Use an email with{" "}
-              <span className="font-medium text-aurora-ink">admin</span> for the
-              admin app.
+              Use your Regalia account credentials to sign in.
             </p>
           </form>
         </div>

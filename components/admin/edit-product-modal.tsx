@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import { createPortal } from 'react-dom';
+import { bffCall } from '@/lib/bff/generated/client';
 import {
   CATALOG_CATEGORIES,
   CATALOG_STATUS_OPTIONS,
@@ -15,6 +16,8 @@ import { cn } from '@/lib/utils';
 const fieldClassName =
   'h-11 w-full rounded-lg border border-[#e5e5e5] bg-white px-3 text-sm text-aurora-ink outline-none placeholder:text-[#9a9a9a] focus:border-aurora-ink/30';
 
+const MAX_PRODUCT_IMAGES = 5;
+
 const EMPTY_FORM = {
   name: '',
   sku: '',
@@ -24,7 +27,40 @@ const EMPTY_FORM = {
   minStock: '20',
   status: 'IN STOCK' as CatalogStatus,
   specs: '',
+  images: [] as string[],
 };
+
+type EditFormState = {
+  name: string;
+  sku: string;
+  category: string;
+  price: string;
+  stock: string;
+  minStock: string;
+  status: CatalogStatus;
+  specs: string;
+  images: string[];
+};
+
+function toFormState(product: CatalogProduct): EditFormState {
+  const images =
+    Array.isArray(product.images) && product.images.length > 0
+      ? product.images.slice(0, MAX_PRODUCT_IMAGES)
+      : product.image
+        ? [product.image]
+        : [];
+  return {
+    name: product.name,
+    sku: product.sku,
+    category: product.category,
+    price: parseCatalogPrice(product.priceLabel),
+    stock: String(product.stock),
+    minStock: String(product.minStock),
+    status: product.status,
+    specs: product.specs ?? product.description,
+    images,
+  };
+}
 
 function FieldLabel({
   children,
@@ -63,30 +99,6 @@ function UploadIcon() {
   );
 }
 
-type EditFormState = {
-  name: string;
-  sku: string;
-  category: string;
-  price: string;
-  stock: string;
-  minStock: string;
-  status: CatalogStatus;
-  specs: string;
-};
-
-function toFormState(product: CatalogProduct): EditFormState {
-  return {
-    name: product.name,
-    sku: product.sku,
-    category: product.category,
-    price: parseCatalogPrice(product.priceLabel),
-    stock: String(product.stock),
-    minStock: String(product.minStock),
-    status: product.status,
-    specs: product.specs ?? product.description,
-  };
-}
-
 type EditProductModalProps = {
   mode: 'edit' | 'add';
   product?: CatalogProduct;
@@ -97,6 +109,8 @@ type EditProductModalProps = {
 export function EditProductModal({ mode, product, onClose, onSave }: EditProductModalProps) {
   const isAdd = mode === 'add';
   const [entered, setEntered] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [form, setForm] = useState<EditFormState>(() =>
     product ? toFormState(product) : EMPTY_FORM,
   );
@@ -123,12 +137,83 @@ export function EditProductModal({ mode, product, onClose, onSave }: EditProduct
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
+  async function handleImageUpload(e: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = '';
+    if (files.length === 0) return;
+
+    const remaining = MAX_PRODUCT_IMAGES - form.images.length;
+    if (remaining <= 0) {
+      setUploadError(`You can upload up to ${MAX_PRODUCT_IMAGES} images.`);
+      return;
+    }
+
+    const selected = files.slice(0, remaining);
+    for (const file of selected) {
+      if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+        setUploadError('Only PNG, JPG, and WebP images are allowed.');
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        setUploadError('Each image must be less than 5MB.');
+        return;
+      }
+    }
+
+    try {
+      setUploadingImage(true);
+      setUploadError(null);
+      const uploaded: string[] = [];
+
+      for (const file of selected) {
+        const presigned = await bffCall<{
+          uploadUrl: string;
+          publicUrl: string;
+          key: string;
+        }>('getStorageUploadUrl', {
+          body: {
+            fileName: file.name,
+            contentType: file.type,
+            folder: 'products',
+          },
+        });
+
+        const uploadRes = await fetch(presigned.uploadUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': file.type },
+          body: file,
+        });
+        if (!uploadRes.ok) {
+          throw new Error('Failed to upload image to Cloudflare R2.');
+        }
+        uploaded.push(presigned.publicUrl);
+      }
+
+      setForm((prev) => ({
+        ...prev,
+        images: [...prev.images, ...uploaded].slice(0, MAX_PRODUCT_IMAGES),
+      }));
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Image upload failed');
+    } finally {
+      setUploadingImage(false);
+    }
+  }
+
+  function removeImage(index: number) {
+    setForm((prev) => ({
+      ...prev,
+      images: prev.images.filter((_, i) => i !== index),
+    }));
+  }
+
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
 
     const name = form.name.trim();
     const sku = form.sku.trim();
     const specs = form.specs.trim();
+    const images = form.images.slice(0, MAX_PRODUCT_IMAGES);
 
     if (!name || !sku || !form.price) return;
 
@@ -143,7 +228,8 @@ export function EditProductModal({ mode, product, onClose, onSave }: EditProduct
       status: form.status,
       description: specs || name,
       specs,
-      image: product?.image ?? '/images/auth-panel.png',
+      image: images[0] || product?.image || '/images/auth-panel.png',
+      images,
     });
   }
 
@@ -309,25 +395,103 @@ export function EditProductModal({ mode, product, onClose, onSave }: EditProduct
             </div>
 
             <div>
-              <FieldLabel htmlFor="product-image">Product Image</FieldLabel>
-              <label
-                htmlFor="product-image"
-                className="flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-[#d4d4d4] bg-[#fafafa] px-4 py-8 text-center transition-colors hover:border-[#bdbdbd] hover:bg-[#f5f5f5]"
-              >
-                <span className="text-[#9a9a9a]">
-                  <UploadIcon />
-                </span>
-                <p className="mt-3 text-sm font-medium text-aurora-ink">
-                  Click to upload or drag and drop
-                </p>
-                <p className="mt-1 text-xs text-[#9a9a9a]">PNG, JPG up to 5MB</p>
-                <input
-                  id="product-image"
-                  type="file"
-                  accept="image/png,image/jpeg"
-                  className="sr-only"
-                />
-              </label>
+              <FieldLabel htmlFor="product-image">
+                {`Product Images (${form.images.length}/${MAX_PRODUCT_IMAGES})`}
+              </FieldLabel>
+              <p className="mb-2 text-xs text-[#9a9a9a]">
+                Upload up to {MAX_PRODUCT_IMAGES} images. The first image is the primary
+                thumbnail — click another to make it primary.
+              </p>
+
+              {form.images.length > 0 ? (
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+                  {form.images.map((url, index) => (
+                    <div
+                      key={`${url}-${index}`}
+                      className={cn(
+                        'relative aspect-square overflow-hidden rounded-lg border bg-white',
+                        index === 0 ? 'border-aurora-ink' : 'border-[#e5e5e5]',
+                      )}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={url}
+                        alt={`Product image ${index + 1}`}
+                        className="h-full w-full object-contain"
+                      />
+                      <div className="absolute inset-x-0 bottom-0 flex gap-1 bg-black/55 p-1">
+                        {index !== 0 ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setForm((prev) => {
+                                const next = [...prev.images];
+                                const [picked] = next.splice(index, 1);
+                                if (!picked) return prev;
+                                return { ...prev, images: [picked, ...next] };
+                              })
+                            }
+                            className="flex-1 rounded bg-white/90 px-1 py-0.5 text-[10px] font-semibold text-aurora-ink"
+                          >
+                            Primary
+                          </button>
+                        ) : (
+                          <span className="flex-1 rounded bg-aurora-lime px-1 py-0.5 text-center text-[10px] font-semibold text-aurora-ink">
+                            Primary
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => removeImage(index)}
+                          className="rounded bg-white/90 px-1.5 py-0.5 text-[10px] font-semibold text-red-600"
+                          aria-label={`Remove image ${index + 1}`}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              {form.images.length < MAX_PRODUCT_IMAGES ? (
+                <label
+                  htmlFor="product-image"
+                  className={cn(
+                    'mt-2 flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-[#d4d4d4] bg-[#fafafa] px-4 py-6 text-center transition-colors hover:border-[#bdbdbd] hover:bg-[#f5f5f5]',
+                    uploadingImage && 'pointer-events-none opacity-60',
+                  )}
+                >
+                  <span className="text-[#9a9a9a]">
+                    <UploadIcon />
+                  </span>
+                  <p className="mt-2 text-sm font-medium text-aurora-ink">
+                    {uploadingImage
+                      ? 'Uploading to Cloudflare R2...'
+                      : form.images.length === 0
+                        ? 'Click to upload images'
+                        : 'Add more images'}
+                  </p>
+                  <p className="mt-1 text-xs text-[#9a9a9a]">
+                    PNG, JPG, WebP up to 5MB · {MAX_PRODUCT_IMAGES - form.images.length}{' '}
+                    remaining
+                  </p>
+                </label>
+              ) : null}
+
+              <input
+                id="product-image"
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                multiple
+                className="sr-only"
+                onChange={handleImageUpload}
+                disabled={uploadingImage || form.images.length >= MAX_PRODUCT_IMAGES}
+              />
+
+              {uploadError ? (
+                <p className="mt-1.5 text-xs text-red-600">{uploadError}</p>
+              ) : null}
             </div>
           </div>
 
