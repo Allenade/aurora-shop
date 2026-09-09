@@ -36,6 +36,7 @@ export type ProfileSettings = {
   companyName: string;
   address: string;
   initials: string;
+  avatarUrl?: string | null;
 };
 
 export const DEFAULT_PROFILE: ProfileSettings = {
@@ -45,6 +46,7 @@ export const DEFAULT_PROFILE: ProfileSettings = {
   companyName: "Tech IT Solutions Ltd",
   address: "123 Victoria Island, Lagos, Nigeria",
   initials: "BB",
+  avatarUrl: null,
 };
 
 export type NotificationPreferenceId =

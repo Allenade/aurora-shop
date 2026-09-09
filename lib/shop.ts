@@ -22,6 +22,8 @@ export type ShopProduct = {
   image: string;
   images: string[];
   isNew?: boolean;
+  sku?: string;
+  minStock?: number;
   highlights: {
     label: string;
     icon: "verified" | "support" | "returns" | "shipping";
@@ -36,6 +38,8 @@ export const SHOP_CATEGORIES = [
   "Sensors",
   "Power Supply",
   "Displays",
+  "Motors",
+  "Powers",
 ] as const;
 
 export const SHOP_BRANDS = [
@@ -43,6 +47,8 @@ export const SHOP_BRANDS = [
   "Raspberry Pi",
   "Adafruit",
   "SparkFun",
+  "Espressif",
+  "Generic",
 ] as const;
 
 export const SHOP_STOCK_OPTIONS = [

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { SearchInput } from "@/components/ui/search-input";
 import { UserMenu } from "@/components/layout/user-menu";
+import { useCartOptional } from "@/lib/cart-store";
 
 function CartIcon() {
   return (
@@ -44,6 +45,9 @@ export function TopBar({
   showCart = true,
   profileHref = "/settings",
 }: TopBarProps) {
+  const cart = useCartOptional();
+  const count = showCart ? (cart?.itemCount ?? 0) : 0;
+
   return (
     <header className="flex h-[72px] shrink-0 items-center border-b border-[#ececec] bg-white px-6">
       <div className="mx-auto flex w-full max-w-6xl items-center gap-4">
@@ -58,10 +62,15 @@ export function TopBar({
           {showCart ? (
             <Link
               href="/cart"
-              className="inline-flex size-10 items-center justify-center rounded-full text-[#5f5f5f] hover:bg-[#f6f6f6]"
-              aria-label="Cart"
+              className="relative inline-flex size-10 items-center justify-center rounded-full text-[#5f5f5f] hover:bg-[#f6f6f6]"
+              aria-label={count > 0 ? `Cart, ${count} items` : "Cart"}
             >
               <CartIcon />
+              {count > 0 ? (
+                <span className="absolute top-1 right-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-aurora-lime px-1 text-[10px] font-bold text-aurora-ink">
+                  {count > 99 ? "99+" : count}
+                </span>
+              ) : null}
             </Link>
           ) : null}
           <button

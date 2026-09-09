@@ -90,7 +90,7 @@ export function UserMenu({
         aria-controls={menuId}
         onClick={() => setOpen((prev) => !prev)}
       >
-        <Avatar initials={initials} />
+        <Avatar initials={initials} src={user?.avatarUrl} />
       </button>
 
       {open ? (

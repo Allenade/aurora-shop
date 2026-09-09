@@ -1,6 +1,19 @@
 import type { OrderTimelineStep } from "@/lib/orders";
 import { cn } from "@/lib/utils";
 
+function formatStepAt(value: string) {
+  if (!value.trim()) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 function CheckIcon() {
   return (
     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
@@ -62,7 +75,9 @@ export function OrderTimeline({ steps }: { steps: OrderTimelineStep[] }) {
                 >
                   {step.label}
                 </p>
-                <p className="mt-0.5 text-xs text-[#9a9a9a]">{step.at}</p>
+                <p className="mt-0.5 text-xs text-[#9a9a9a]">
+                  {formatStepAt(step.at)}
+                </p>
               </div>
             </li>
           );

@@ -11,81 +11,152 @@ import {
   type SubmittedQuote,
 } from "@/components/procurements/quote-submitted";
 import { RecentQuotes } from "@/components/procurements/recent-quotes";
+import { BffRequestError } from "@/lib/bff/client";
 import { bffCall } from "@/lib/bff/generated/client";
-import {
-  createDraftQuote,
-  createQuoteReferenceId,
-  type RecentQuote,
-} from "@/lib/procurements";
+import { createQuoteReferenceId, type RecentQuote } from "@/lib/procurements";
+import { useProcurementSession } from "@/lib/procurement-session-store";
+
+function errorMessage(err: unknown, fallback: string) {
+  if (err instanceof BffRequestError) return err.message || fallback;
+  return fallback;
+}
 
 export function ProcurementPage() {
-  const [quotes, setQuotes] = useState<RecentQuote[]>([]);
+  const { quotes, loaded, error, isStale, apply, fail } =
+    useProcurementSession();
   const [editingQuote, setEditingQuote] = useState<RecentQuote | null>(null);
   const [submittedQuote, setSubmittedQuote] = useState<SubmittedQuote | null>(
     null,
   );
   const [formKey, setFormKey] = useState(0);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   function refreshQuotes() {
     void bffCall<RecentQuote[]>("listQuotes")
       .then((rows) => {
-        if (Array.isArray(rows)) setQuotes(rows);
+        if (Array.isArray(rows)) apply(rows);
       })
-      .catch(() => undefined);
+      .catch((err) => {
+        const message = errorMessage(err, "Unable to load quotes.");
+        if (!loaded) {
+          fail(message);
+          setActionError(message);
+        }
+      });
   }
 
   useEffect(() => {
+    if (loaded && !isStale()) return;
     refreshQuotes();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded, isStale]);
 
-  function handleSubmitted(
+  async function handleSubmitted(
     form: QuoteFormState,
     currentEditing: RecentQuote | null,
   ) {
-    const referenceNumber =
-      currentEditing?.status === "Draft"
-        ? currentEditing.id
-        : createQuoteReferenceId();
+    setActionError(null);
+    setActionMessage(null);
+    setBusy(true);
 
-    setEditingQuote(null);
-    setSubmittedQuote({
-      ...form,
-      referenceNumber,
-    });
-    void bffCall<RecentQuote>("createQuote", {
-      body: { ...form, submit: true },
-    })
-      .then((created) => {
-        if (created?.id) {
-          setSubmittedQuote({ ...form, referenceNumber: created.id });
-        }
+    try {
+      if (currentEditing?.status === "Pending" && currentEditing.internalId) {
+        await bffCall<RecentQuote>("updateQuote", {
+          params: { id: currentEditing.internalId },
+          body: { ...form },
+        });
+        setEditingQuote(null);
+        setFormKey((k) => k + 1);
+        setActionMessage(`Quote ${currentEditing.id} updated.`);
         refreshQuotes();
-      })
-      .catch(() => undefined);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+
+      if (currentEditing?.status === "Draft" && currentEditing.internalId) {
+        const updated = await bffCall<RecentQuote>("updateQuote", {
+          params: { id: currentEditing.internalId },
+          body: { ...form, submit: true },
+        });
+        setEditingQuote(null);
+        setSubmittedQuote({
+          ...form,
+          referenceNumber: updated?.id ?? currentEditing.id,
+        });
+        refreshQuotes();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+
+      const referenceNumber = createQuoteReferenceId();
+      setEditingQuote(null);
+      setSubmittedQuote({ ...form, referenceNumber });
+      const created = await bffCall<RecentQuote>("createQuote", {
+        body: { ...form, submit: true },
+      });
+      if (created?.id) {
+        setSubmittedQuote({ ...form, referenceNumber: created.id });
+      }
+      refreshQuotes();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (err) {
+      setActionError(errorMessage(err, "Unable to submit quote request."));
+    } finally {
+      setBusy(false);
+    }
   }
 
-  function handleSaveDraft(
+  async function handleSaveDraft(
     form: QuoteFormState,
     currentEditing: RecentQuote | null,
   ) {
-    const draft = createDraftQuote(
-      form,
-      currentEditing?.status === "Draft" ? currentEditing : null,
-    );
+    setActionError(null);
+    setActionMessage(null);
+    setBusy(true);
 
-    setQuotes((prev) => {
-      const withoutCurrent = prev.filter((q) => q.id !== draft.id);
-      return [draft, ...withoutCurrent];
-    });
-    void bffCall("createQuote", { body: { ...form, submit: false } })
-      .then(() => refreshQuotes())
-      .catch(() => undefined);
-    setEditingQuote(null);
+    const editableId =
+      currentEditing?.internalId &&
+      (currentEditing.status === "Draft" || currentEditing.status === "Pending")
+        ? currentEditing.internalId
+        : null;
+
+    try {
+      if (editableId) {
+        const updated = await bffCall<RecentQuote>("updateQuote", {
+          params: { id: editableId },
+          body: { ...form, submit: false },
+        });
+        setEditingQuote(null);
+        setFormKey((k) => k + 1);
+        setActionMessage(
+          `Draft ${updated?.id ?? currentEditing?.id ?? ""} saved.`,
+        );
+        refreshQuotes();
+        return;
+      }
+
+      const created = await bffCall<RecentQuote>("createQuote", {
+        body: { ...form, submit: false },
+      });
+      setEditingQuote(null);
+      setFormKey((k) => k + 1);
+      setActionMessage(
+        created?.id ? `Draft ${created.id} saved.` : "Draft saved.",
+      );
+      refreshQuotes();
+    } catch (err) {
+      setActionError(errorMessage(err, "Unable to save draft."));
+      refreshQuotes();
+    } finally {
+      setBusy(false);
+    }
   }
 
   function handleSubmitAnother() {
     setSubmittedQuote(null);
+    setActionError(null);
+    setActionMessage(null);
     setFormKey((k) => k + 1);
   }
 
@@ -100,6 +171,8 @@ export function ProcurementPage() {
     );
   }
 
+  const listError = actionError ?? error;
+
   return (
     <div className="mx-auto w-full max-w-6xl">
       <div className="mb-6">
@@ -111,11 +184,26 @@ export function ProcurementPage() {
         </p>
       </div>
 
+      {listError ? (
+        <p className="mb-4 text-sm font-medium text-[#d64545]" role="alert">
+          {listError}
+        </p>
+      ) : null}
+      {actionMessage ? (
+        <p className="mb-4 text-sm font-medium text-[#1f9d57]" role="status">
+          {actionMessage}
+        </p>
+      ) : null}
+
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1.55fr)_minmax(280px,0.85fr)]">
         <QuoteRequestForm
           key={editingQuote?.id ?? `new-quote-${formKey}`}
           editingQuote={editingQuote}
-          onClearEdit={() => setEditingQuote(null)}
+          busy={busy}
+          onClearEdit={() => {
+            setEditingQuote(null);
+            setActionError(null);
+          }}
           onSubmitted={handleSubmitted}
           onSaveDraft={handleSaveDraft}
         />
@@ -126,6 +214,8 @@ export function ProcurementPage() {
             editingId={editingQuote?.id ?? null}
             onEdit={(quote) => {
               if (quote.status !== "Pending" && quote.status !== "Draft") return;
+              setActionError(null);
+              setActionMessage(null);
               setEditingQuote(quote);
               window.scrollTo({ top: 0, behavior: "smooth" });
             }}

@@ -26,6 +26,12 @@ export function toCatalogProduct(
   product: ShopProduct & { sku?: string; minStock?: number },
 ): CatalogProduct {
   const minStock = product.minStock ?? 5;
+  const images =
+    Array.isArray(product.images) && product.images.length > 0
+      ? product.images.slice(0, 5)
+      : product.image
+        ? [product.image]
+        : [];
   return {
     id: product.id,
     name: product.name,
@@ -36,7 +42,8 @@ export function toCatalogProduct(
     stock: product.stockCount,
     minStock,
     status: catalogStatusFromStock(product.stockCount, minStock),
-    image: product.image,
+    image: images[0] ?? product.image,
+    images,
     specs: product.specs?.map((spec) => `${spec.label}: ${spec.value}`).join("; "),
   };
 }

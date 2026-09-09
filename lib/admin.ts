@@ -234,6 +234,7 @@ export type CatalogProduct = {
   minStock: number;
   status: CatalogStatus;
   image: string;
+  images?: string[];
   specs?: string;
 };
 

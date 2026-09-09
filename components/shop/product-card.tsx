@@ -1,6 +1,9 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
+import { useCart } from "@/lib/cart-store";
 import type { ShopProduct } from "@/lib/shop";
 import { cn } from "@/lib/utils";
 
@@ -14,7 +17,25 @@ function badgeClass(badge?: ShopProduct["badge"]) {
   return "border-[#9fd9b5] bg-[#eefbf3] text-[#1f9d57]";
 }
 
+function productHint(product: ShopProduct) {
+  return {
+    productId: product.id,
+    name: product.name,
+    image: product.image,
+    price: product.price,
+    priceLabel: product.priceLabel,
+    stockCount: product.stockCount,
+  };
+}
+
 export function ProductCard({ product }: { product: ShopProduct }) {
+  const cart = useCart();
+  const inCart = cart.isInCart(product.slug);
+  const qty = cart.qtyFor(product.slug);
+  const max = Math.max(0, product.stockCount);
+  const available = product.stockStatus !== "out_of_stock" && max > 0;
+  const hint = productHint(product);
+
   return (
     <Card className="flex h-full flex-col p-3">
       <Link
@@ -61,12 +82,46 @@ export function ProductCard({ product }: { product: ShopProduct }) {
         </div>
 
         <div className="mt-4">
-          <Link
-            href={`/cart?add=${encodeURIComponent(product.slug)}`}
-            className="inline-flex h-10 w-full items-center justify-center whitespace-nowrap rounded-lg bg-aurora-lime px-3 text-sm font-semibold text-aurora-ink transition-opacity hover:opacity-90"
-          >
-            Add to Cart
-          </Link>
+          {!available ? (
+            <button
+              type="button"
+              disabled
+              className="inline-flex h-10 w-full items-center justify-center rounded-lg border border-[#e5e5e5] bg-[#f7f7f7] px-3 text-sm font-semibold text-[#9a9a9a]"
+            >
+              Out of Stock
+            </button>
+          ) : inCart ? (
+            <div className="flex h-10 w-full items-center overflow-hidden rounded-lg border border-[#d4d4d4] bg-white">
+              <button
+                type="button"
+                onClick={() => cart.dec(product.slug)}
+                className="flex h-full w-11 shrink-0 items-center justify-center text-lg text-[#5f5f5f] hover:bg-[#f6f6f6]"
+                aria-label="Decrease quantity"
+              >
+                −
+              </button>
+              <span className="flex h-full min-w-0 flex-1 items-center justify-center border-x border-[#e5e5e5] text-sm font-semibold text-aurora-ink">
+                {qty}
+              </span>
+              <button
+                type="button"
+                disabled={qty >= max}
+                onClick={() => cart.inc(product.slug, max, hint)}
+                className="flex h-full w-11 shrink-0 items-center justify-center text-lg text-[#5f5f5f] hover:bg-[#f6f6f6] disabled:opacity-40"
+                aria-label="Increase quantity"
+              >
+                +
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => cart.add(product.slug, 1, hint)}
+              className="inline-flex h-10 w-full items-center justify-center whitespace-nowrap rounded-lg bg-aurora-lime px-3 text-sm font-semibold text-aurora-ink transition-opacity hover:opacity-90"
+            >
+              Add to Cart
+            </button>
+          )}
         </div>
       </div>
     </Card>

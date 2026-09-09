@@ -314,7 +314,11 @@ export function ProductCatalog() {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '');
-    const image = next.image || '/images/auth-panel.png';
+    const images =
+      Array.isArray(next.images) && next.images.length > 0
+        ? next.images.slice(0, 5)
+        : [next.image || '/images/auth-panel.png'];
+    const image = images[0] || '/images/auth-panel.png';
     const payload = {
       name: next.name,
       subtitle: next.description,
@@ -326,7 +330,7 @@ export function ProductCatalog() {
       minStock: next.minStock,
       slug: slug || `product-${Date.now()}`,
       image,
-      images: [image],
+      images,
       specs: specsFromText(next.specs ?? next.description),
     };
     const exists = Boolean(editingId) && products.some((product) => product.id === next.id);

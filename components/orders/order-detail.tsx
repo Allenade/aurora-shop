@@ -7,6 +7,18 @@ import { OrderSummaryCard } from "@/components/orders/order-summary-card";
 import { OrderTimeline } from "@/components/orders/order-timeline";
 import type { OrderRecord } from "@/lib/orders";
 
+function formatPlacedAt(value: string) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 function BackIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -38,7 +50,7 @@ export function OrderDetail({ order }: { order: OrderRecord }) {
           </h1>
         </div>
         <p className="mt-1 ml-10 text-sm text-[#8a8a8a]">
-          Placed on {order.placedAt}
+          Placed on {formatPlacedAt(order.placedAt) || order.date}
         </p>
       </div>
 
@@ -49,7 +61,7 @@ export function OrderDetail({ order }: { order: OrderRecord }) {
           <OrderSummaryCard order={order} />
           <OrderPaymentCard order={order} />
           <OrderShippingCard order={order} />
-          <OrderDetailActions />
+          <OrderDetailActions order={order} />
         </div>
       </div>
 

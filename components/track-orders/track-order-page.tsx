@@ -1,8 +1,10 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { TrackOrderResult } from "@/components/track-orders/track-order-result";
+import { BffRequestError } from "@/lib/bff/client";
 import { bffCall } from "@/lib/bff/generated/client";
 import type { TrackedShipment } from "@/lib/track-orders";
 
@@ -26,52 +28,99 @@ function SearchIcon() {
   );
 }
 
-function TrackOrderContent() {
-  const searchParams = useSearchParams();
-  const initialQuery = searchParams.get("q")?.trim() ?? "";
-  const [query, setQuery] = useState(initialQuery);
-  const [shipment, setShipment] = useState<TrackedShipment | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [searched, setSearched] = useState(Boolean(initialQuery));
-  const [loading, setLoading] = useState(false);
+type LookupState = {
+  key: string;
+  shipment: TrackedShipment | null;
+  error: string | null;
+  loading: boolean;
+  searched: boolean;
+};
 
-  async function lookup(nextQuery: string) {
-    const q = nextQuery.trim();
-    setSearched(true);
-    if (!q) {
-      setShipment(null);
-      setError("Enter a tracking or order number.");
-      return;
-    }
-    setLoading(true);
-    try {
-      const result = await bffCall<TrackedShipment>("trackOrder", {
-        query: { q },
-      });
-      setShipment(result);
-      setError(null);
-    } catch {
-      setShipment(null);
-      setError("No order found for that tracking number.");
-    } finally {
-      setLoading(false);
-    }
+function TrackOrderContent() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const urlQuery = searchParams.get("q")?.trim() ?? "";
+
+  const [draftQuery, setDraftQuery] = useState(urlQuery);
+  const [urlSynced, setUrlSynced] = useState(urlQuery);
+  if (urlQuery !== urlSynced) {
+    setUrlSynced(urlQuery);
+    setDraftQuery(urlQuery);
   }
+
+  const [lookup, setLookup] = useState<LookupState>(() => ({
+    key: urlQuery,
+    shipment: null,
+    error: null,
+    loading: Boolean(urlQuery),
+    searched: Boolean(urlQuery),
+  }));
+
+  useEffect(() => {
+    const q = urlQuery.trim();
+    if (!q) return;
+
+    let cancelled = false;
+
+    void bffCall<TrackedShipment>("trackOrder", { query: { q } })
+      .then((result) => {
+        if (cancelled) return;
+        setLookup({
+          key: q,
+          shipment: result,
+          error: null,
+          loading: false,
+          searched: true,
+        });
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setLookup({
+          key: q,
+          shipment: null,
+          error:
+            err instanceof BffRequestError && err.status === 404
+              ? "No order found for that tracking or order number."
+              : err instanceof BffRequestError
+                ? err.message
+                : "Unable to look up this shipment.",
+          loading: false,
+          searched: true,
+        });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [urlQuery]);
+
+  const forKey = lookup.key === urlQuery;
+  const shipment = forKey ? lookup.shipment : null;
+  const error = forKey
+    ? lookup.error
+    : urlQuery
+      ? null
+      : lookup.error;
+  const loading = Boolean(urlQuery) && (!forKey || lookup.loading);
+  const searched = Boolean(urlQuery) || lookup.searched;
 
   function handleTrack(e: React.FormEvent) {
     e.preventDefault();
-    void lookup(query);
+    const q = draftQuery.trim();
+    if (!q) {
+      setLookup({
+        key: "",
+        shipment: null,
+        error: "Enter a tracking or order number.",
+        loading: false,
+        searched: true,
+      });
+      return;
+    }
+    const next = `${pathname}?q=${encodeURIComponent(q)}`;
+    router.replace(next);
   }
-
-  useEffect(() => {
-    if (!initialQuery) return;
-    const timer = setTimeout(() => {
-      void lookup(initialQuery);
-    }, 0);
-    return () => clearTimeout(timer);
-    // initial URL lookup only
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   return (
     <div className="mx-auto w-full max-w-3xl">
@@ -80,7 +129,7 @@ function TrackOrderContent() {
           Track Order
         </h1>
         <p className="mt-1 text-sm text-[#8a8a8a]">
-          Enter your tracking number to see order status
+          Enter your tracking or order number to see order status
         </p>
       </div>
 
@@ -94,10 +143,12 @@ function TrackOrderContent() {
             <SearchIcon />
           </span>
           <input
-            value={query}
+            value={draftQuery}
             onChange={(e) => {
-              setQuery(e.target.value);
-              if (error) setError(null);
+              setDraftQuery(e.target.value);
+              if (error) {
+                setLookup((prev) => ({ ...prev, error: null }));
+              }
             }}
             placeholder="Enter Tracking Number (eg. TRK-897420)"
             className="h-12 w-full rounded-lg border border-[#d9d9d9] bg-white pr-3.5 pl-11 text-sm text-aurora-ink outline-none transition-[border-color,box-shadow] placeholder:text-[#b0b0b0] focus:border-aurora-ink focus:ring-2 focus:ring-aurora-lime/35"
@@ -105,9 +156,10 @@ function TrackOrderContent() {
         </label>
         <button
           type="submit"
-          className="inline-flex h-12 shrink-0 items-center justify-center whitespace-nowrap rounded-lg bg-aurora-lime px-5 text-sm font-semibold text-aurora-ink transition-opacity hover:opacity-90"
+          disabled={loading}
+          className="inline-flex h-12 shrink-0 items-center justify-center whitespace-nowrap rounded-lg bg-aurora-lime px-5 text-sm font-semibold text-aurora-ink transition-opacity hover:opacity-90 disabled:opacity-60"
         >
-          Track Order
+          {loading ? "Tracking…" : "Track Order"}
         </button>
       </form>
 
@@ -121,9 +173,17 @@ function TrackOrderContent() {
         </p>
       ) : null}
 
-      {shipment ? (
+      {shipment && !loading ? (
         <div className="mt-6">
           <TrackOrderResult shipment={shipment} />
+          <div className="mt-4">
+            <Link
+              href={`/orders/${encodeURIComponent(shipment.orderId)}`}
+              className="text-sm font-semibold text-[#2f6fed] underline-offset-2 hover:underline"
+            >
+              View order details
+            </Link>
+          </div>
         </div>
       ) : null}
 
