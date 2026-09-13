@@ -93,3 +93,5 @@ jobs:
         run: bun run build
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'
+          BACKEND_URL: http://127.0.0.1:4000
+          SESSION_SECRET: ci-build-session-secret-not-for-production

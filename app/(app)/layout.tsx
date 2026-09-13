@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { AppProviders } from "@/components/providers/app-providers";
-import { getCurrentUser } from "@/lib/bff/auth";
+import { requireBuyerUser } from "@/lib/bff/guards";
 
 export const metadata: Metadata = {
   title: {
@@ -16,9 +15,7 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const user = await getCurrentUser();
-  if (!user) redirect("/auth/signin");
-  if (user.type === "admin") redirect("/admin/overview");
+  const user = await requireBuyerUser();
 
   return (
     <AppProviders user={user}>

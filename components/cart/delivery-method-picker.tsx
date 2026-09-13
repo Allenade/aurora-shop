@@ -45,7 +45,7 @@ export function DeliveryMethodPicker({
     <div>
       <h2 className="text-base font-bold text-aurora-ink">Delivery Method</h2>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+      <div className="mt-4 grid grid-cols-1 gap-3 min-[480px]:grid-cols-2">
         {DELIVERY_METHODS.map((method) => {
           const selected = value === method.id;
           return (
@@ -54,7 +54,7 @@ export function DeliveryMethodPicker({
               type="button"
               onClick={() => onChange(method.id)}
               className={cn(
-                "flex items-center gap-3 rounded-xl border-2 px-4 py-3.5 text-left transition-colors",
+                "flex min-w-0 items-center gap-3 rounded-xl border-2 px-3.5 py-3.5 text-left transition-colors sm:px-4",
                 selected
                   ? "border-aurora-lime bg-[#f3ffc7]"
                   : "border-[#e5e5e5] bg-white hover:border-[#d0d0d0]",
@@ -78,7 +78,7 @@ export function DeliveryMethodPicker({
                   {method.description}
                 </span>
               </span>
-              <span className="shrink-0 text-sm font-semibold text-aurora-ink">
+              <span className="shrink-0 text-sm font-semibold whitespace-nowrap text-aurora-ink">
                 {formatCartMoney(method.price)}
               </span>
             </button>

@@ -1,12 +1,17 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AdminOrderDetailDrawer } from '@/components/admin/admin-order-detail-drawer';
 import { Badge } from '@/components/ui/badge';
+import { TableSkeletonRows } from '@/components/ui/skeleton';
 import {
   type AdminOrder,
   type AdminOrderStatus,
 } from '@/lib/admin';
+import {
+  ADMIN_ORDERS_INITIAL_KEY,
+  type AdminListInitialData,
+} from '@/lib/bff/admin-list';
 import { BffRequestError } from '@/lib/bff/client';
 import { bffCall } from '@/lib/bff/generated/client';
 import { fulfillmentStatus, toAdminOrder } from '@/lib/bff/map';
@@ -153,20 +158,29 @@ function buildPageItems(current: number, total: number) {
   return items;
 }
 
-export function AdminOrders() {
-  const [orders, setOrders] = useState<AdminOrder[]>([]);
+export function AdminOrders({
+  initialData,
+}: {
+  initialData?: AdminListInitialData<AdminOrder>;
+}) {
+  const [orders, setOrders] = useState<AdminOrder[]>(initialData?.items ?? []);
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('All Orders');
   const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [pageCount, setPageCount] = useState(1);
+  const [total, setTotal] = useState(initialData?.total ?? 0);
+  const [pageCount, setPageCount] = useState(initialData?.pageCount ?? 1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [fetchState, setFetchState] = useState<{
     key: string | null;
     error: string | null;
-  }>({ key: null, error: null });
+  }>(() =>
+    initialData
+      ? { key: ADMIN_ORDERS_INITIAL_KEY, error: initialData.error }
+      : { key: null, error: null },
+  );
+  const skipKeyRef = useRef(initialData ? ADMIN_ORDERS_INITIAL_KEY : null);
 
   const fetchKey = `${debouncedQuery}\0${filter}\0${page}\0${reloadKey}`;
   const loading = fetchState.key !== fetchKey;
@@ -181,6 +195,11 @@ export function AdminOrders() {
   }, [query]);
 
   useEffect(() => {
+    if (skipKeyRef.current === fetchKey) {
+      skipKeyRef.current = null;
+      return;
+    }
+
     let cancelled = false;
     const key = fetchKey;
 
@@ -284,8 +303,6 @@ export function AdminOrders() {
         </p>
       ) : null}
 
-      {loading ? <p className="mb-4 text-sm text-[#8a8a8a]">Loading orders…</p> : null}
-
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative min-w-0 flex-1">
           <span className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-[#9a9a9a]">
@@ -348,7 +365,9 @@ export function AdminOrders() {
               </tr>
             </thead>
             <tbody>
-              {orders.length === 0 && !loading ? (
+              {loading && orders.length === 0 ? (
+                <TableSkeletonRows columns={8} rows={PAGE_SIZE} />
+              ) : orders.length === 0 && !loading ? (
                 <tr>
                   <td colSpan={8} className="py-16 text-center text-sm text-[#8a8a8a]">
                     No orders match this search.

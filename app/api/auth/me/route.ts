@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { AuthError, getCurrentUser } from "@/lib/bff/auth";
+import { readSessionCookie } from "@/lib/bff/session-cookie";
 
 export async function GET() {
   try {
@@ -7,7 +8,11 @@ export async function GET() {
     if (!user) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
-    return NextResponse.json({ user });
+    const session = await readSessionCookie();
+    return NextResponse.json({
+      user,
+      expiresAt: session?.exp ?? null,
+    });
   } catch (error) {
     if (error instanceof AuthError) {
       return NextResponse.json(

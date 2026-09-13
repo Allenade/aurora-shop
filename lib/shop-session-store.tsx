@@ -10,12 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import type { ShopFilterState } from "@/components/shop/shop-filters";
-import {
-  SHOP_BRANDS,
-  SHOP_CATEGORIES,
-  SHOP_PRICE_MAX,
-  type ShopProduct,
-} from "@/lib/shop";
+import { SHOP_PRICE_MAX, type ShopProduct } from "@/lib/shop";
 
 export type ShopListSession = {
   filterKey: string;
@@ -52,6 +47,8 @@ type ShopSessionContextValue = {
   setCategoryOptions: (options: string[]) => void;
   brandOptions: string[];
   setBrandOptions: (options: string[]) => void;
+  facetsReady: boolean;
+  setFacetsReady: (ready: boolean) => void;
   error: string | null;
   setError: (error: string | null) => void;
   listSession: ShopListSession;
@@ -83,8 +80,10 @@ function createSeed() {
 export function shopFilterKey(
   filters: ShopFilterState,
   priceFilterEnabled: boolean,
+  searchQuery = "",
 ) {
   return JSON.stringify({
+    q: searchQuery.trim() || null,
     categories: filters.categories,
     brands: filters.brands,
     stock: filters.stock,
@@ -106,10 +105,9 @@ export function ShopSessionProvider({ children }: { children: ReactNode }) {
   const [pageCount, setPageCount] = useState(1);
   const [resolvedKey, setResolvedKey] = useState<string | null>(null);
   const [catalogMaxPrice, setCatalogMaxPrice] = useState(SHOP_PRICE_MAX);
-  const [categoryOptions, setCategoryOptions] = useState<string[]>([
-    ...SHOP_CATEGORIES,
-  ]);
-  const [brandOptions, setBrandOptions] = useState<string[]>([...SHOP_BRANDS]);
+  const [categoryOptions, setCategoryOptions] = useState<string[]>([]);
+  const [brandOptions, setBrandOptions] = useState<string[]>([]);
+  const [facetsReady, setFacetsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [listSession, setListSession] = useState<ShopListSession>(() => ({
     filterKey: shopFilterKey(INITIAL_FILTERS, false),
@@ -160,6 +158,8 @@ export function ShopSessionProvider({ children }: { children: ReactNode }) {
       setCategoryOptions,
       brandOptions,
       setBrandOptions,
+      facetsReady,
+      setFacetsReady,
       error,
       setError,
       listSession,
@@ -182,6 +182,7 @@ export function ShopSessionProvider({ children }: { children: ReactNode }) {
       catalogMaxPrice,
       categoryOptions,
       brandOptions,
+      facetsReady,
       error,
       listSession,
       scrollY,

@@ -11,6 +11,7 @@ import {
 import { BffRequestError } from '@/lib/bff/client';
 import { bffCall } from '@/lib/bff/generated/client';
 import { toAdminUser } from '@/lib/bff/map';
+import { TableSkeletonRows } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
 const PAGE_SIZE = 10;
@@ -258,8 +259,6 @@ export function AdminUsers() {
         </p>
       ) : null}
 
-      {loading ? <p className="mb-4 text-sm text-[#8a8a8a]">Loading users…</p> : null}
-
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative min-w-0 flex-1">
           <span className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-[#9a9a9a]">
@@ -313,7 +312,9 @@ export function AdminUsers() {
               </tr>
             </thead>
             <tbody>
-              {users.length === 0 && !loading ? (
+              {loading && users.length === 0 ? (
+                <TableSkeletonRows columns={6} rows={PAGE_SIZE} />
+              ) : users.length === 0 && !loading ? (
                 <tr>
                   <td colSpan={6} className="py-16 text-center text-sm text-[#8a8a8a]">
                     No users match this search.

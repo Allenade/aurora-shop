@@ -1,4 +1,5 @@
 import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import type { OrderBreakdownItem } from "@/lib/admin";
 import { cn } from "@/lib/utils";
 
@@ -23,7 +24,12 @@ export function AdminOrderBreakdown({
       </div>
 
       <ul className="mt-5 flex flex-1 flex-col gap-4">
-        {items.map((item) => (
+        {items.length === 0 ? (
+          <li>
+            <EmptyState description="No order breakdown data yet." />
+          </li>
+        ) : (
+          items.map((item) => (
           <li key={item.id}>
             <div className="mb-1.5 flex items-center justify-between gap-3 text-sm">
               <span className="font-medium text-aurora-ink">{item.label}</span>
@@ -38,7 +44,8 @@ export function AdminOrderBreakdown({
               />
             </div>
           </li>
-        ))}
+          ))
+        )}
       </ul>
     </Card>
   );

@@ -11,6 +11,7 @@ import { BffRequestError } from '@/lib/bff/client';
 import { bffCall } from '@/lib/bff/generated/client';
 import { quoteApiStatus, toAdminProcurement } from '@/lib/bff/map';
 import type { RecentQuote } from '@/lib/procurements';
+import { TableSkeletonRows } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
 const PAGE_SIZE = 10;
@@ -309,10 +310,6 @@ export function AdminProcurement() {
         </p>
       ) : null}
 
-      {loading ? (
-        <p className="mb-4 text-sm text-[#8a8a8a]">Loading procurement requests…</p>
-      ) : null}
-
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative min-w-0 flex-1">
           <span className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-[#9a9a9a]">
@@ -368,7 +365,9 @@ export function AdminProcurement() {
               </tr>
             </thead>
             <tbody>
-              {requests.length === 0 && !loading ? (
+              {loading && requests.length === 0 ? (
+                <TableSkeletonRows columns={7} rows={PAGE_SIZE} />
+              ) : requests.length === 0 && !loading ? (
                 <tr>
                   <td colSpan={7} className="py-16 text-center text-sm text-[#8a8a8a]">
                     No procurement requests match this search.

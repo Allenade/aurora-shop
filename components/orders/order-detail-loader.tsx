@@ -2,12 +2,15 @@
 
 import { notFound } from "next/navigation";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { OrderDetail } from "@/components/orders/order-detail";
 import { OrderDetailGate } from "@/components/orders/order-detail-gate";
+import { EmptyState } from "@/components/ui/empty-state";
 import { BffRequestError } from "@/lib/bff/client";
 import { bffCall } from "@/lib/bff/generated/client";
 import { useOrdersSession } from "@/lib/orders-session-store";
 import type { OrderRecord } from "@/lib/orders";
+import { DetailPageSkeleton } from "@/components/ui/skeleton";
 
 type LoadState = {
   id: string;
@@ -68,16 +71,18 @@ export function OrderDetailLoader({ id }: { id: string }) {
           });
           return;
         }
+        const message =
+          status === 404
+            ? null
+            : err instanceof BffRequestError
+              ? err.message
+              : "Unable to load this order.";
+        if (message) toast.error(message);
         setResult({
           id,
           order: null,
           missing: status === 404,
-          error:
-            status === 404
-              ? null
-              : err instanceof BffRequestError
-                ? err.message
-                : "Unable to load this order.",
+          error: message,
           fetching: false,
         });
       });
@@ -88,11 +93,7 @@ export function OrderDetailLoader({ id }: { id: string }) {
   }, [id, getCachedOrder, cacheOrder]);
 
   if (showLoading) {
-    return (
-      <div className="mx-auto w-full max-w-6xl py-10 text-sm text-[#8a8a8a]">
-        Loading order…
-      </div>
-    );
+    return <DetailPageSkeleton />;
   }
 
   if (missing && !order) notFound();
@@ -100,22 +101,13 @@ export function OrderDetailLoader({ id }: { id: string }) {
   if ((error || !order) && !fetching) {
     return (
       <div className="mx-auto w-full max-w-6xl py-10">
-        <p
-          className="rounded-xl border border-[#f0b4b4] bg-[#fff5f5] px-4 py-3 text-sm text-[#d64545]"
-          role="alert"
-        >
-          {error ?? "Order not found."}
-        </p>
+        <EmptyState description={error ?? "Order not found."} />
       </div>
     );
   }
 
   if (!order) {
-    return (
-      <div className="mx-auto w-full max-w-6xl py-10 text-sm text-[#8a8a8a]">
-        Loading order…
-      </div>
-    );
+    return <DetailPageSkeleton />;
   }
 
   return (

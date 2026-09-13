@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import {
   EyeIcon,
   Field,
@@ -85,16 +86,12 @@ export function SecurityForm() {
   });
   const [errors, setErrors] = useState<Partial<SecurityFormState>>({});
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [savedMessage, setSavedMessage] = useState<string | null>(null);
 
   function update<K extends keyof SecurityFormState>(
     key: K,
     value: SecurityFormState[K],
   ) {
     setForm((prev) => ({ ...prev, [key]: value }));
-    if (savedMessage) setSavedMessage(null);
-    if (error) setError(null);
     if (errors[key]) {
       setErrors((prev) => {
         const next = { ...prev };
@@ -125,8 +122,6 @@ export function SecurityForm() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setSavedMessage(null);
-    setError(null);
     if (!validate()) return;
 
     setSaving(true);
@@ -137,13 +132,13 @@ export function SecurityForm() {
       },
     })
       .then(() => {
-        setSavedMessage("Password updated successfully.");
+        toast.success("Password updated successfully.");
         setForm(INITIAL);
         setErrors({});
         setVisible({ current: false, next: false, confirm: false });
       })
       .catch((err) => {
-        setError(
+        toast.error(
           err instanceof BffRequestError
             ? err.message
             : "Could not update password.",
@@ -203,21 +198,6 @@ export function SecurityForm() {
           />
         </div>
       </div>
-
-      {error ? (
-        <p
-          className="mt-4 rounded-xl border border-[#f0b4b4] bg-[#fff5f5] px-4 py-3 text-sm text-[#d64545]"
-          role="alert"
-        >
-          {error}
-        </p>
-      ) : null}
-
-      {savedMessage ? (
-        <p className="mt-4 text-sm font-medium text-[#1f9d57]" role="status">
-          {savedMessage}
-        </p>
-      ) : null}
 
       <div className="mt-6">
         <button

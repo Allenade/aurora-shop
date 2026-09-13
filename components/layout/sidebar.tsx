@@ -3,8 +3,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect } from "react";
 import { NavIcon } from "@/components/layout/nav-icons";
 import { NeedHelpCard } from "@/components/layout/need-help-card";
+import { sidebarAsideClassName } from "@/components/layout/shell-with-sidebar";
 import { useSidebar } from "@/components/layout/sidebar-context";
 import { Can } from "@/lib/permissions";
 import { APP_NAV } from "@/lib/dashboard";
@@ -36,14 +38,19 @@ function CollapseIcon({ collapsed }: { collapsed: boolean }) {
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { collapsed, toggle } = useSidebar();
+  const { collapsed, toggle, setCollapsed } = useSidebar();
+
+  // Close mobile drawer after navigation.
+  useEffect(() => {
+    if (window.matchMedia("(max-width: 1023px)").matches) {
+      setCollapsed(true);
+    }
+  }, [pathname, setCollapsed]);
 
   return (
     <aside
-      className={cn(
-        "flex h-full shrink-0 flex-col border-r border-[#ececec] bg-white py-4 transition-[width] duration-200 ease-out",
-        collapsed ? "w-[76px] px-2.5" : "w-[260px] px-4",
-      )}
+      className={sidebarAsideClassName(collapsed)}
+      aria-label="Main navigation"
     >
       <div
         className={cn(
