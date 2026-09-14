@@ -3,23 +3,21 @@
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-type CopyValueButtonProps = {
-  value: string;
+type CopyTrackingButtonProps = {
+  trackingNumber: string;
   className?: string;
-  label?: string;
 };
 
-export function CopyValueButton({
-  value,
+export function CopyTrackingButton({
+  trackingNumber,
   className,
-  label = "Copy",
-}: CopyValueButtonProps) {
+}: CopyTrackingButtonProps) {
   async function handleCopy() {
     try {
-      await navigator.clipboard.writeText(value);
-      toast.success("Copied to clipboard.");
+      await navigator.clipboard.writeText(trackingNumber);
+      toast.success("Tracking number copied.");
     } catch {
-      toast.error("Could not copy.");
+      toast.error("Could not copy tracking number.");
     }
   }
 
@@ -28,18 +26,12 @@ export function CopyValueButton({
       type="button"
       onClick={() => void handleCopy()}
       className={cn(
-        "inline-flex shrink-0 items-center gap-1.5 text-sm font-medium text-[#8a8a8a] transition-colors hover:text-aurora-ink",
+        "inline-flex items-center gap-1.5 text-sm font-semibold text-[#2f6fed] transition-opacity hover:opacity-80",
         className,
       )}
-      aria-label={`Copy ${value}`}
+      aria-label={`Copy tracking number ${trackingNumber}`}
     >
-      <svg
-        width="15"
-        height="15"
-        viewBox="0 0 24 24"
-        fill="none"
-        aria-hidden
-      >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
         <rect
           x="8"
           y="8"
@@ -56,7 +48,7 @@ export function CopyValueButton({
           strokeLinecap="round"
         />
       </svg>
-      {label}
+      Copy
     </button>
   );
 }

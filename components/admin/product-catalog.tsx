@@ -1,17 +1,24 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { EditProductModal } from '@/components/admin/edit-product-modal';
 import { RemoveProductModal } from '@/components/admin/remove-product-modal';
 import {
   type CatalogProduct,
   type CatalogStatus,
 } from '@/lib/admin';
+import {
+  ADMIN_PRODUCTS_INITIAL_KEY,
+  type AdminListInitialData,
+} from '@/lib/bff/admin-list';
 import { BffRequestError } from '@/lib/bff/client';
 import { bffCall } from '@/lib/bff/generated/client';
 import { toCatalogProduct } from '@/lib/bff/map';
+import { stockStatusQueryParam } from '@/lib/domain/stock';
 import type { ShopProduct } from '@/lib/shop';
+import { TableSkeletonRows } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
 const PAGE_SIZE = 10;
@@ -198,21 +205,41 @@ type ProductListResponse = {
 };
 
 function statusQueryParam(filter: (typeof FILTERS)[number]) {
-  if (filter === 'In Stock') return 'in_stock';
-  if (filter === 'Low Stock') return 'low_stock';
-  if (filter === 'Critical') return 'critical';
-  if (filter === 'Out of Stock') return 'out_of_stock';
-  return undefined;
+  return stockStatusQueryParam(filter === 'All Products' ? undefined : filter);
 }
 
-export function ProductCatalog() {
-  const [products, setProducts] = useState<CatalogProduct[]>([]);
-  const [query, setQuery] = useState('');
-  const [debouncedQuery, setDebouncedQuery] = useState('');
+export function ProductCatalog({
+  initialData,
+}: {
+  initialData?: AdminListInitialData<CatalogProduct>;
+}) {
+  const searchParams = useSearchParams();
+  const urlQuery = searchParams.get('q')?.trim() ?? '';
+
+  // Remount when the URL query changes so local search state resets without an effect.
+  return (
+    <ProductCatalogContent
+      key={urlQuery}
+      urlQuery={urlQuery}
+      initialData={urlQuery ? undefined : initialData}
+    />
+  );
+}
+
+function ProductCatalogContent({
+  urlQuery,
+  initialData,
+}: {
+  urlQuery: string;
+  initialData?: AdminListInitialData<CatalogProduct>;
+}) {
+  const [products, setProducts] = useState<CatalogProduct[]>(initialData?.items ?? []);
+  const [query, setQuery] = useState(urlQuery);
+  const [debouncedQuery, setDebouncedQuery] = useState(urlQuery);
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('All Products');
   const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [pageCount, setPageCount] = useState(1);
+  const [total, setTotal] = useState(initialData?.total ?? 0);
+  const [pageCount, setPageCount] = useState(initialData?.pageCount ?? 1);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
@@ -221,7 +248,14 @@ export function ProductCatalog() {
   const [fetchState, setFetchState] = useState<{
     key: string | null;
     error: string | null;
-  }>({ key: null, error: null });
+  }>(() =>
+    initialData
+      ? { key: ADMIN_PRODUCTS_INITIAL_KEY, error: initialData.error }
+      : { key: null, error: null },
+  );
+  const skipKeyRef = useRef(
+    initialData && !urlQuery ? ADMIN_PRODUCTS_INITIAL_KEY : null,
+  );
 
   const fetchKey = `${debouncedQuery}\0${filter}\0${page}\0${reloadKey}`;
   const loading = fetchState.key !== fetchKey;
@@ -236,6 +270,11 @@ export function ProductCatalog() {
   }, [query]);
 
   useEffect(() => {
+    if (skipKeyRef.current === fetchKey) {
+      skipKeyRef.current = null;
+      return;
+    }
+
     let cancelled = false;
     const key = fetchKey;
 
@@ -391,10 +430,6 @@ export function ProductCatalog() {
         </p>
       ) : null}
 
-      {loading ? (
-        <p className="mb-4 text-sm text-[#8a8a8a]">Loading products…</p>
-      ) : null}
-
       {saving ? (
         <p className="mb-4 text-sm text-[#8a8a8a]">Saving product…</p>
       ) : null}
@@ -454,7 +489,9 @@ export function ProductCatalog() {
               </tr>
             </thead>
             <tbody>
-              {products.length === 0 && !loading ? (
+              {loading && products.length === 0 ? (
+                <TableSkeletonRows columns={7} rows={PAGE_SIZE} />
+              ) : products.length === 0 && !loading ? (
                 <tr>
                   <td colSpan={7} className="py-16 text-center text-sm text-[#8a8a8a]">
                     No products match this search.

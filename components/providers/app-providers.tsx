@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { SessionExpiryWatcher } from "@/components/providers/session-expiry-watcher";
 import { CartProvider } from "@/lib/cart-store";
 import { DashboardSessionProvider } from "@/lib/dashboard-session-store";
 import { OrdersSessionProvider } from "@/lib/orders-session-store";
@@ -18,6 +19,7 @@ export function AppProviders({
 }) {
   return (
     <PermissionProvider user={user}>
+      <SessionExpiryWatcher />
       <CartProvider>
         <ShopSessionProvider>
           <OrdersSessionProvider>

@@ -5,21 +5,16 @@ import type {
   AdminProcurementStatus,
   AdminUser,
   CatalogProduct,
-  CatalogStatus,
   InventoryItem,
 } from "@/lib/admin";
+import { catalogStatusLabel } from "@/lib/domain/stock";
 import type { OrderRecord } from "@/lib/orders";
 import type { RecentQuote } from "@/lib/procurements";
 import type { ShopProduct } from "@/lib/shop";
 
-export function catalogStatusFromStock(
-  stock: number,
-  minStock: number,
-): CatalogStatus {
-  if (stock <= 0) return "OUT OF STOCK";
-  if (stock <= Math.max(1, Math.floor(minStock / 2))) return "CRITICAL";
-  if (stock <= minStock) return "LOW STOCK";
-  return "IN STOCK";
+/** @deprecated Prefer `catalogStatusLabel` from `@/lib/domain/stock`. */
+export function catalogStatusFromStock(stock: number, minStock: number) {
+  return catalogStatusLabel(stock, minStock);
 }
 
 export function toCatalogProduct(
@@ -41,10 +36,12 @@ export function toCatalogProduct(
     priceLabel: product.priceLabel,
     stock: product.stockCount,
     minStock,
-    status: catalogStatusFromStock(product.stockCount, minStock),
+    status: catalogStatusLabel(product.stockCount, minStock),
     image: images[0] ?? product.image,
     images,
-    specs: product.specs?.map((spec) => `${spec.label}: ${spec.value}`).join("; "),
+    specs: product.specs
+      ?.map((spec) => `${spec.label}: ${spec.value}`)
+      .join("; "),
   };
 }
 
@@ -72,7 +69,7 @@ export function toInventoryItem(row: {
     stock,
     capacity: minStock,
     lastRestocked: row.lastRestocked ?? "—",
-    status: catalogStatusFromStock(stock, minStock),
+    status: catalogStatusLabel(stock, minStock),
   };
 }
 

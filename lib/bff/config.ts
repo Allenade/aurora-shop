@@ -3,20 +3,15 @@ import type { SessionUser, UserType } from "@/lib/permissions/permissions.types"
 /** Cookie name — opaque to browser JS (httpOnly). */
 export const SESSION_COOKIE = "aurora_session";
 
-export type AuthMode = "mock" | "upstream";
-
-export function getAuthMode(): AuthMode {
-  const mode = process.env.AUTH_MODE?.trim().toLowerCase();
-  return mode === "upstream" ? "upstream" : "mock";
-}
-
 export function getSessionSecret(): string {
   const secret = process.env.SESSION_SECRET?.trim();
-  if (secret) return secret;
   if (process.env.NODE_ENV === "production") {
-    throw new Error("SESSION_SECRET is required in production");
+    if (!secret || secret.includes("change-me")) {
+      throw new Error("SESSION_SECRET must be a strong secret in production");
+    }
+    return secret;
   }
-  return "aurora-dev-session-secret-change-me";
+  return secret || "aurora-dev-session-secret-change-me";
 }
 
 export function getBackendUrl(): string | null {

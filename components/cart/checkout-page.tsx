@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { BankTransferPayment } from "@/components/cart/bank-transfer-payment";
 import { CardPaymentForm } from "@/components/cart/card-payment-form";
 import { CheckoutSteps } from "@/components/cart/checkout-steps";
@@ -10,6 +11,8 @@ import { DeliveryInformationForm } from "@/components/cart/delivery-information-
 import { OrderPlacedSuccess } from "@/components/cart/order-placed-success";
 import { OrderSummaryCard } from "@/components/cart/order-summary-card";
 import { ReviewPayment } from "@/components/cart/review-payment";
+import { CheckoutSkeleton } from "@/components/ui/skeleton";
+import { LoadingSpinner } from "@/components/ui/spinner";
 import {
   DELIVERY_METHODS,
   getCartTotals,
@@ -69,6 +72,25 @@ type CartLine = {
 
 type CheckoutPhase = "delivery" | "review" | "bank" | "card" | "success";
 
+type PaymentStatusResponse = {
+  reference: string;
+  provider: "paystack" | "bank";
+  status: "pending" | "success" | "failed" | "refunded" | "cancelled";
+  paid: boolean;
+  orderNumber?: string;
+  trackingNumber?: string;
+};
+
+const PAYMENT_POLL_ATTEMPTS = 8;
+const PAYMENT_POLL_DELAY_MS = 2000;
+
+/** Paystack appends `reference`/`trxref`; our own callback URL carries `pay`. */
+function paymentReturnReference(params: URLSearchParams) {
+  return (
+    params.get("reference") ?? params.get("trxref") ?? params.get("pay") ?? null
+  );
+}
+
 function CheckoutPageContent() {
   const searchParams = useSearchParams();
   const buySlug = searchParams.get("buy");
@@ -89,8 +111,8 @@ function CheckoutPageContent() {
   const [errors, setErrors] = useState<
     Partial<Record<keyof DeliveryFormState, string>>
   >({});
+  const [shippingLoading, setShippingLoading] = useState(true);
   const [authorizationUrl, setAuthorizationUrl] = useState<string | null>(null);
-  const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [deliveryId, setDeliveryId] = useState<DeliveryMethodId>("standard");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethodId>("bank");
   const [orderId, setOrderId] = useState<string | null>(null);
@@ -103,14 +125,53 @@ function CheckoutPageContent() {
     accountName: string;
     accountNumber: string;
   } | null>(null);
-  const [reorderNotices, setReorderNotices] = useState<string[]>([]);
+  const [clearingCart, setClearingCart] = useState(false);
+  const [placingOrder, setPlacingOrder] = useState(false);
+  const [confirmingPayment, setConfirmingPayment] = useState(
+    () => paymentReturnReference(searchParams) !== null,
+  );
 
   useEffect(() => {
     // sessionStorage is client-only; defer so we don't sync-set in the effect body
     const id = window.setTimeout(() => {
-      setReorderNotices(readReorderNotices());
+      const notices = readReorderNotices();
+      for (const notice of notices) {
+        toast.message(notice);
+      }
     }, 0);
     return () => window.clearTimeout(id);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void bffCall<{
+      fullName?: string;
+      email?: string;
+      phone?: string;
+      streetAddress?: string;
+      city?: string;
+      state?: string;
+      note?: string;
+    }>("getShippingSettings")
+      .then((data) => {
+        if (cancelled) return;
+        setForm({
+          fullName: data.fullName?.trim() ?? "",
+          email: data.email?.trim() ?? "",
+          phone: data.phone?.trim() ?? "",
+          streetAddress: data.streetAddress?.trim() ?? "",
+          city: data.city?.trim() ?? "",
+          state: data.state?.trim() ?? "",
+          note: data.note?.trim() ?? "",
+        });
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setShippingLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const delivery =
@@ -137,23 +198,52 @@ function CheckoutPageContent() {
   }
 
   useEffect(() => {
-    const payRef = searchParams.get("pay");
-    const mock = searchParams.get("mock");
-    if (!payRef || mock !== "1") return;
-    void bffCall("handlePaymentCallback", {
-      params: { provider: "paystack" },
-      body: {
-        event: "charge.success",
-        data: { reference: payRef, status: "success" },
-      },
-    })
-      .then(() => {
-        setOrderId(payRef);
-        setTrackingNumber(payRef);
-        setPhase("success");
-        clearPurchasedItems();
-      })
-      .catch(() => undefined);
+    const payRef = paymentReturnReference(searchParams);
+    if (!payRef) return;
+
+    let cancelled = false;
+
+    // Paystack confirms out-of-band, so poll our own backend until it verifies.
+    void (async () => {
+      for (let attempt = 0; attempt < PAYMENT_POLL_ATTEMPTS; attempt += 1) {
+        if (cancelled) return;
+        try {
+          const status = await bffCall<PaymentStatusResponse>(
+            "getTransactionStatus",
+            { params: { reference: payRef } },
+          );
+          if (cancelled) return;
+          if (status.paid) {
+            setConfirmingPayment(false);
+            setPaymentMethod(status.provider === "bank" ? "bank" : "card");
+            completeOrder(
+              status.orderNumber ?? payRef,
+              status.trackingNumber ?? undefined,
+            );
+            return;
+          }
+          if (status.status === "failed" || status.status === "cancelled") {
+            setConfirmingPayment(false);
+            toast.error("Payment was not completed. You can try again.");
+            return;
+          }
+        } catch {
+          // Keep polling — the webhook may still be in flight.
+        }
+        await new Promise((resolve) =>
+          window.setTimeout(resolve, PAYMENT_POLL_DELAY_MS),
+        );
+      }
+      if (cancelled) return;
+      setConfirmingPayment(false);
+      toast.message(
+        "We haven't received confirmation yet. Check your orders in a moment.",
+      );
+    })();
+
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per pay callback
   }, [searchParams]);
 
@@ -222,22 +312,37 @@ function CheckoutPageContent() {
     if (lines.length === 0) return;
     if (phase === "delivery") {
       if (!validate()) return;
+      // Persist for next checkout (Nest also saves again on place-order).
+      void bffCall("updateShippingSettings", {
+        body: {
+          fullName: form.fullName.trim(),
+          email: form.email.trim(),
+          phone: form.phone.trim(),
+          streetAddress: form.streetAddress.trim(),
+          city: form.city.trim(),
+          state: form.state.trim(),
+          note: form.note.trim() || undefined,
+        },
+      }).catch(() => undefined);
       setPhase("review");
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
 
     if (phase === "review") {
+      if (placingOrder) return;
       void (async () => {
+        setPlacingOrder(true);
         try {
-          setCheckoutError(null);
           await placeOrderOnServer();
           setPhase(paymentMethod === "bank" ? "bank" : "card");
           window.scrollTo({ top: 0, behavior: "smooth" });
         } catch (error) {
-          setCheckoutError(
+          toast.error(
             error instanceof Error ? error.message : "Unable to place order",
           );
+        } finally {
+          setPlacingOrder(false);
         }
       })();
     }
@@ -265,12 +370,37 @@ function CheckoutPageContent() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  if (cart.loading) {
+  async function handleClearCart() {
+    if (clearingCart || lines.length === 0) return;
+    setClearingCart(true);
+    try {
+      await cart.clear();
+      toast.success("Cart cleared.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not clear cart.",
+      );
+    } finally {
+      setClearingCart(false);
+    }
+  }
+
+  if (confirmingPayment) {
     return (
-      <div className="mx-auto w-full max-w-6xl py-10 text-sm text-[#8a8a8a]">
-        Loading cart…
+      <div className="mx-auto flex w-full max-w-6xl flex-col items-center gap-3 py-20 text-center">
+        <LoadingSpinner className="text-aurora-ink" />
+        <p className="text-sm font-semibold text-aurora-ink">
+          Confirming your payment…
+        </p>
+        <p className="text-sm text-[#8a8a8a]">
+          This takes a few seconds. Please don&apos;t close this page.
+        </p>
       </div>
     );
+  }
+
+  if (cart.loading || shippingLoading) {
+    return <CheckoutSkeleton />;
   }
 
   if (phase === "success" && orderId && trackingNumber) {
@@ -308,7 +438,7 @@ function CheckoutPageContent() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-6xl">
+    <div className="mx-auto w-full min-w-0 max-w-6xl">
       <div className="mb-5">
         <h1 className="text-[1.75rem] font-bold tracking-tight text-aurora-ink">
           Checkout
@@ -318,41 +448,31 @@ function CheckoutPageContent() {
         </p>
       </div>
 
-      {reorderNotices.length > 0 ? (
-        <div
-          className="mb-4 rounded-xl border border-[#f0d9a8] bg-[#fff8eb] px-4 py-3 text-sm text-[#8a5a00]"
-          role="status"
-        >
-          <p className="font-semibold text-aurora-ink">Re-order notes</p>
-          <ul className="mt-1.5 list-disc space-y-1 pl-5">
-            {reorderNotices.map((notice) => (
-              <li key={notice}>{notice}</li>
-            ))}
-          </ul>
-          <button
-            type="button"
-            onClick={() => setReorderNotices([])}
-            className="mt-2 text-xs font-semibold text-aurora-ink underline"
-          >
-            Dismiss
-          </button>
-        </div>
-      ) : null}
-
       <div className="mb-6">
         <CheckoutSteps step={step} />
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.55fr)_minmax(280px,0.85fr)]">
-        <div className="min-w-0">
+      <div className="grid w-full min-w-0 gap-5 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,0.85fr)]">
+        <div className="min-w-0 w-full">
           {phase === "delivery" ? (
-            <DeliveryInformationForm
-              form={form}
-              errors={errors}
-              onChange={updateForm}
-              deliveryId={deliveryId}
-              onDeliveryChange={setDeliveryId}
-            />
+            <>
+              {form.fullName ||
+              form.email ||
+              form.phone ||
+              form.streetAddress ? (
+                <p className="mb-3 text-sm text-[#8a8a8a]">
+                  Details are prefilled from your saved address. Edit anything
+                  before continuing.
+                </p>
+              ) : null}
+              <DeliveryInformationForm
+                form={form}
+                errors={errors}
+                onChange={updateForm}
+                deliveryId={deliveryId}
+                onDeliveryChange={setDeliveryId}
+              />
+            </>
           ) : null}
 
           {phase === "review" ? (
@@ -381,13 +501,19 @@ function CheckoutPageContent() {
               onPay={handleCardPlaceOrder}
             />
           ) : null}
-          {checkoutError ? (
-            <p className="mt-3 text-sm text-[#d64545]">{checkoutError}</p>
-          ) : null}
         </div>
 
-        <div className="flex h-fit flex-col gap-3 lg:sticky lg:top-6">
-          <OrderSummaryCard lines={lines} delivery={delivery} />
+        <div className="flex w-full min-w-0 flex-col gap-3 lg:sticky lg:top-6 lg:h-fit">
+          <OrderSummaryCard
+            lines={lines}
+            delivery={delivery}
+            clearing={clearingCart}
+            onClearCart={
+              phase === "delivery" || phase === "review"
+                ? () => void handleClearCart()
+                : undefined
+            }
+          />
 
           {phase === "delivery" ? (
             <button
@@ -405,10 +531,21 @@ function CheckoutPageContent() {
               <button
                 type="button"
                 onClick={handleContinue}
-                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-aurora-lime text-sm font-semibold text-aurora-ink transition-opacity hover:opacity-90"
+                disabled={placingOrder}
+                aria-busy={placingOrder}
+                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-aurora-lime text-sm font-semibold text-aurora-ink transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-70"
               >
-                <PlaceOrderIcon />
-                Place Order
+                {placingOrder ? (
+                  <>
+                    <LoadingSpinner />
+                    <span>Placing order…</span>
+                  </>
+                ) : (
+                  <>
+                    <PlaceOrderIcon />
+                    Place Order
+                  </>
+                )}
               </button>
               <p className="text-center text-xs text-[#8a8a8a]">
                 By placing your order, you agree to our Terms & Conditions.
@@ -476,13 +613,7 @@ function CheckoutPageInner() {
 export function CheckoutPage() {
   return (
     <RequirePermission action={Action.READ} resource={Resource.SHOP}>
-      <Suspense
-        fallback={
-          <div className="mx-auto w-full max-w-6xl py-10 text-sm text-[#8a8a8a]">
-            Loading checkout…
-          </div>
-        }
-      >
+      <Suspense fallback={<CheckoutSkeleton />}>
         <CheckoutPageInner />
       </Suspense>
     </RequirePermission>

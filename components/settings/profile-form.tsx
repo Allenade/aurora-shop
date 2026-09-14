@@ -7,11 +7,13 @@ import {
   type ChangeEvent,
 } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Field, TextInput } from "@/components/auth/form-controls";
 import { Avatar } from "@/components/ui/avatar";
 import { BffRequestError } from "@/lib/bff/client";
 import { bffCall } from "@/lib/bff/generated/client";
 import type { ProfileSettings } from "@/lib/settings";
+import { ProfileFormSkeleton } from "@/components/ui/skeleton";
 
 function initialsFromName(fullName: string) {
   const parts = fullName.trim().split(/\s+/).filter(Boolean);
@@ -38,8 +40,6 @@ export function ProfileForm() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [savedMessage, setSavedMessage] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -60,12 +60,11 @@ export function ProfileForm() {
         };
         setForm(next);
         setLoaded(next);
-        setError(null);
         setLoading(false);
       })
       .catch((err) => {
         if (cancelled) return;
-        setError(
+        toast.error(
           err instanceof BffRequestError
             ? err.message
             : "Unable to load profile from the API.",
@@ -89,8 +88,6 @@ export function ProfileForm() {
       }
       return next;
     });
-    if (savedMessage) setSavedMessage(null);
-    if (error && loaded) setError(null);
   }
 
   function applyAvatar(avatarUrl: string | null) {
@@ -105,17 +102,15 @@ export function ProfileForm() {
     if (!file) return;
 
     if (!["image/png", "image/jpeg", "image/webp", "image/gif"].includes(file.type)) {
-      setError("Only JPG, PNG, WebP, or GIF images are allowed.");
+      toast.error("Only JPG, PNG, WebP, or GIF images are allowed.");
       return;
     }
     if (file.size > 2 * 1024 * 1024) {
-      setError("Image size must be less than 2MB.");
+      toast.error("Image size must be less than 2MB.");
       return;
     }
 
     setUploadingAvatar(true);
-    setError(null);
-    setSavedMessage(null);
 
     try {
       const presigned = await bffCall<{
@@ -144,9 +139,9 @@ export function ProfileForm() {
         { body: { avatarUrl: presigned.publicUrl } },
       );
       applyAvatar(result.avatarUrl ?? presigned.publicUrl);
-      setSavedMessage("Profile photo updated.");
+      toast.success("Profile photo updated.");
     } catch (err) {
-      setError(
+      toast.error(
         err instanceof BffRequestError
           ? err.message
           : err instanceof Error
@@ -160,14 +155,12 @@ export function ProfileForm() {
 
   async function handleRemoveAvatar() {
     setUploadingAvatar(true);
-    setError(null);
-    setSavedMessage(null);
     try {
       await bffCall("deleteProfileAvatar");
       applyAvatar(null);
-      setSavedMessage("Profile photo removed.");
+      toast.success("Profile photo removed.");
     } catch (err) {
-      setError(
+      toast.error(
         err instanceof BffRequestError
           ? err.message
           : "Could not remove profile photo.",
@@ -180,8 +173,6 @@ export function ProfileForm() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    setSavedMessage(null);
-    setError(null);
 
     void bffCall("updateProfileSettings", {
       body: {
@@ -198,11 +189,11 @@ export function ProfileForm() {
         };
         setForm(next);
         setLoaded(next);
-        setSavedMessage("Profile changes saved.");
+        toast.success("Profile changes saved.");
         router.refresh();
       })
       .catch((err) => {
-        setError(
+        toast.error(
           err instanceof BffRequestError
             ? err.message
             : "Could not save profile.",
@@ -213,28 +204,18 @@ export function ProfileForm() {
 
   function handleCancel() {
     if (loaded) setForm(loaded);
-    setSavedMessage(null);
-    setError(null);
   }
 
   if (loading) {
-    return (
-      <div className="p-5 sm:p-6 lg:p-8">
-        <h2 className="text-lg font-bold text-aurora-ink">Profile Information</h2>
-        <p className="mt-4 text-sm text-[#8a8a8a]">Loading profile…</p>
-      </div>
-    );
+    return <ProfileFormSkeleton />;
   }
 
-  if (!loaded && error) {
+  if (!loaded) {
     return (
       <div className="p-5 sm:p-6 lg:p-8">
         <h2 className="text-lg font-bold text-aurora-ink">Profile Information</h2>
-        <p
-          className="mt-4 rounded-xl border border-[#f0b4b4] bg-[#fff5f5] px-4 py-3 text-sm text-[#d64545]"
-          role="alert"
-        >
-          {error}
+        <p className="mt-4 text-sm text-[#8a8a8a]">
+          Unable to load profile. Try refreshing the page.
         </p>
       </div>
     );
@@ -337,21 +318,6 @@ export function ProfileForm() {
           </Field>
         </div>
       </div>
-
-      {error ? (
-        <p
-          className="mt-4 rounded-xl border border-[#f0b4b4] bg-[#fff5f5] px-4 py-3 text-sm text-[#d64545]"
-          role="alert"
-        >
-          {error}
-        </p>
-      ) : null}
-
-      {savedMessage ? (
-        <p className="mt-4 text-sm font-medium text-[#1f9d57]" role="status">
-          {savedMessage}
-        </p>
-      ) : null}
 
       <div className="mt-7 flex flex-col gap-2.5 sm:flex-row sm:items-center">
         <button

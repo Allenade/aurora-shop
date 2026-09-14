@@ -3,10 +3,13 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { TrackOrderResult } from "@/components/track-orders/track-order-result";
 import { BffRequestError } from "@/lib/bff/client";
 import { bffCall } from "@/lib/bff/generated/client";
 import type { TrackedShipment } from "@/lib/track-orders";
+import { TrackResultSkeleton } from "@/components/ui/skeleton";
+import { LoadingSpinner } from "@/components/ui/spinner";
 
 function SearchIcon() {
   return (
@@ -31,7 +34,6 @@ function SearchIcon() {
 type LookupState = {
   key: string;
   shipment: TrackedShipment | null;
-  error: string | null;
   loading: boolean;
   searched: boolean;
 };
@@ -52,7 +54,6 @@ function TrackOrderContent() {
   const [lookup, setLookup] = useState<LookupState>(() => ({
     key: urlQuery,
     shipment: null,
-    error: null,
     loading: Boolean(urlQuery),
     searched: Boolean(urlQuery),
   }));
@@ -69,22 +70,22 @@ function TrackOrderContent() {
         setLookup({
           key: q,
           shipment: result,
-          error: null,
           loading: false,
           searched: true,
         });
       })
       .catch((err) => {
         if (cancelled) return;
+        const message =
+          err instanceof BffRequestError && err.status === 404
+            ? "No order found for that tracking or order number."
+            : err instanceof BffRequestError
+              ? err.message
+              : "Unable to look up this shipment.";
+        toast.error(message);
         setLookup({
           key: q,
           shipment: null,
-          error:
-            err instanceof BffRequestError && err.status === 404
-              ? "No order found for that tracking or order number."
-              : err instanceof BffRequestError
-                ? err.message
-                : "Unable to look up this shipment.",
           loading: false,
           searched: true,
         });
@@ -97,11 +98,6 @@ function TrackOrderContent() {
 
   const forKey = lookup.key === urlQuery;
   const shipment = forKey ? lookup.shipment : null;
-  const error = forKey
-    ? lookup.error
-    : urlQuery
-      ? null
-      : lookup.error;
   const loading = Boolean(urlQuery) && (!forKey || lookup.loading);
   const searched = Boolean(urlQuery) || lookup.searched;
 
@@ -109,10 +105,10 @@ function TrackOrderContent() {
     e.preventDefault();
     const q = draftQuery.trim();
     if (!q) {
+      toast.error("Enter a tracking or order number.");
       setLookup({
         key: "",
         shipment: null,
-        error: "Enter a tracking or order number.",
         loading: false,
         searched: true,
       });
@@ -144,12 +140,7 @@ function TrackOrderContent() {
           </span>
           <input
             value={draftQuery}
-            onChange={(e) => {
-              setDraftQuery(e.target.value);
-              if (error) {
-                setLookup((prev) => ({ ...prev, error: null }));
-              }
-            }}
+            onChange={(e) => setDraftQuery(e.target.value)}
             placeholder="Enter Tracking Number (eg. TRK-897420)"
             className="h-12 w-full rounded-lg border border-[#d9d9d9] bg-white pr-3.5 pl-11 text-sm text-aurora-ink outline-none transition-[border-color,box-shadow] placeholder:text-[#b0b0b0] focus:border-aurora-ink focus:ring-2 focus:ring-aurora-lime/35"
           />
@@ -157,21 +148,21 @@ function TrackOrderContent() {
         <button
           type="submit"
           disabled={loading}
-          className="inline-flex h-12 shrink-0 items-center justify-center whitespace-nowrap rounded-lg bg-aurora-lime px-5 text-sm font-semibold text-aurora-ink transition-opacity hover:opacity-90 disabled:opacity-60"
+          aria-busy={loading}
+          className="inline-flex h-12 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-aurora-lime px-5 text-sm font-semibold text-aurora-ink transition-opacity hover:opacity-90 disabled:opacity-60"
         >
-          {loading ? "Tracking…" : "Track Order"}
+          {loading ? (
+            <>
+              <LoadingSpinner className="size-4" />
+              <span>Tracking…</span>
+            </>
+          ) : (
+            "Track Order"
+          )}
         </button>
       </form>
 
-      {loading ? (
-        <p className="mt-4 text-sm text-[#8a8a8a]">Looking up shipment…</p>
-      ) : null}
-
-      {error ? (
-        <p className="mt-4 text-sm font-medium text-[#d64545]" role="alert">
-          {error}
-        </p>
-      ) : null}
+      {loading ? <TrackResultSkeleton /> : null}
 
       {shipment && !loading ? (
         <div className="mt-6">
@@ -200,8 +191,8 @@ export function TrackOrderPage() {
   return (
     <Suspense
       fallback={
-        <div className="mx-auto w-full max-w-3xl py-10 text-sm text-[#8a8a8a]">
-          Loading…
+        <div className="mx-auto w-full max-w-3xl">
+          <TrackResultSkeleton />
         </div>
       }
     >

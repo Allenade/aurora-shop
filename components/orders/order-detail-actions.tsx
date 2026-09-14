@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { toast } from "sonner";
+import { TrackOrderButton } from "@/components/orders/track-order-button";
 import { useCart } from "@/lib/cart-store";
 import type { OrderRecord } from "@/lib/orders";
 import {
@@ -19,8 +21,6 @@ export function OrderDetailActions({ order }: OrderDetailActionsProps) {
   const router = useRouter();
   const cart = useCart();
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [notices, setNotices] = useState<string[]>([]);
 
   const canTrack =
     order.status !== "Delivered" &&
@@ -30,29 +30,34 @@ export function OrderDetailActions({ order }: OrderDetailActionsProps) {
   async function handleReorder() {
     const lines = reorderLinesFromOrder(order);
     if (lines.length === 0) {
-      setError("This order has no products that can be re-ordered.");
-      setNotices([]);
+      toast.error("This order has no products that can be re-ordered.");
       return;
     }
     try {
       setBusy(true);
-      setError(null);
-      setNotices([]);
       // Stock checks run quickly; cart writes continue in the background.
       const result = await cart.mergeItems(lines);
       const nextNotices = formatMergeNotices(result);
       if (!result.addedAny) {
-        setNotices(
-          nextNotices.length > 0
-            ? nextNotices
-            : ["None of the items from this order could be added to your cart."],
+        toast.error(
+          nextNotices[0] ??
+            "None of the items from this order could be added to your cart.",
         );
+        for (const notice of nextNotices.slice(1)) {
+          toast.message(notice);
+        }
         return;
       }
       saveReorderNotices(nextNotices);
+      for (const notice of nextNotices) {
+        toast.message(notice);
+      }
+      if (nextNotices.length === 0) {
+        toast.success("Items added to cart.");
+      }
       router.push("/cart");
     } catch (err) {
-      setError(
+      toast.error(
         err instanceof Error ? err.message : "Unable to add items to cart.",
       );
     } finally {
@@ -63,12 +68,10 @@ export function OrderDetailActions({ order }: OrderDetailActionsProps) {
   return (
     <div className="flex flex-col gap-2.5">
       {canTrack ? (
-        <Link
-          href={`/track-orders?q=${encodeURIComponent(order.trackingNumber)}`}
-          className="inline-flex h-11 w-full items-center justify-center whitespace-nowrap rounded-lg bg-aurora-lime px-4 text-sm font-semibold text-aurora-ink transition-opacity hover:opacity-90"
-        >
-          Track Order
-        </Link>
+        <TrackOrderButton
+          trackingNumber={order.trackingNumber}
+          className="h-11 w-full bg-aurora-lime px-4 transition-opacity hover:opacity-90"
+        />
       ) : null}
       <button
         type="button"
@@ -88,21 +91,6 @@ export function OrderDetailActions({ order }: OrderDetailActionsProps) {
       >
         Contact Support
       </Link>
-      {error ? (
-        <p className="text-xs text-[#d64545]" role="alert">
-          {error}
-        </p>
-      ) : null}
-      {notices.length > 0 ? (
-        <ul
-          className="space-y-1 rounded-lg border border-[#f0d9a8] bg-[#fff8eb] px-3 py-2 text-xs text-[#8a5a00]"
-          role="status"
-        >
-          {notices.map((notice) => (
-            <li key={notice}>{notice}</li>
-          ))}
-        </ul>
-      ) : null}
     </div>
   );
 }

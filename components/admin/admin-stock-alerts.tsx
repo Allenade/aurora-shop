@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import type { StockAlert, StockAlertLevel } from "@/lib/admin";
 import { cn } from "@/lib/utils";
 
@@ -23,7 +24,12 @@ export function AdminStockAlerts({ alerts }: { alerts: StockAlert[] }) {
       </div>
 
       <ul className="mt-4 flex flex-1 flex-col gap-3">
-        {alerts.map((alert) => (
+        {alerts.length === 0 ? (
+          <li>
+            <EmptyState description="No stock alerts right now. Inventory looks healthy." />
+          </li>
+        ) : (
+          alerts.map((alert) => (
           <li
             key={alert.id}
             className="rounded-xl border border-[#ececec] px-3.5 py-3"
@@ -57,7 +63,8 @@ export function AdminStockAlerts({ alerts }: { alerts: StockAlert[] }) {
               </div>
             </div>
           </li>
-        ))}
+          ))
+        )}
       </ul>
     </Card>
   );

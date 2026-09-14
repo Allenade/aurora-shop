@@ -2,12 +2,15 @@
 
 import { notFound } from "next/navigation";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { ProductDetail } from "@/components/shop/product-detail";
 import { ShopProductGate } from "@/components/shop/shop-product-gate";
+import { EmptyState } from "@/components/ui/empty-state";
 import { BffRequestError } from "@/lib/bff/client";
 import { bffCall } from "@/lib/bff/generated/client";
 import { useShopSession } from "@/lib/shop-session-store";
 import type { ShopProduct } from "@/lib/shop";
+import { DetailPageSkeleton } from "@/components/ui/skeleton";
 
 type LoadState = {
   slug: string;
@@ -68,16 +71,18 @@ export function ProductDetailLoader({ slug }: { slug: string }) {
           });
           return;
         }
+        const message =
+          status === 404
+            ? null
+            : err instanceof BffRequestError
+              ? err.message
+              : "Unable to load this product.";
+        if (message) toast.error(message);
         setResult({
           slug,
           product: null,
           missing: status === 404,
-          error:
-            status === 404
-              ? null
-              : err instanceof BffRequestError
-                ? err.message
-                : "Unable to load this product.",
+          error: message,
           fetching: false,
         });
       });
@@ -88,11 +93,7 @@ export function ProductDetailLoader({ slug }: { slug: string }) {
   }, [slug, getCachedProduct, cacheProduct]);
 
   if (showLoading) {
-    return (
-      <div className="mx-auto w-full max-w-6xl py-10 text-sm text-[#8a8a8a]">
-        Loading product…
-      </div>
-    );
+    return <DetailPageSkeleton />;
   }
 
   if (missing && !product) notFound();
@@ -100,22 +101,13 @@ export function ProductDetailLoader({ slug }: { slug: string }) {
   if ((error || !product) && !fetching) {
     return (
       <div className="mx-auto w-full max-w-6xl py-10">
-        <p
-          className="rounded-xl border border-[#f0b4b4] bg-[#fff5f5] px-4 py-3 text-sm text-[#d64545]"
-          role="alert"
-        >
-          {error ?? "Product not found."}
-        </p>
+        <EmptyState description={error ?? "Product not found."} />
       </div>
     );
   }
 
   if (!product) {
-    return (
-      <div className="mx-auto w-full max-w-6xl py-10 text-sm text-[#8a8a8a]">
-        Loading product…
-      </div>
-    );
+    return <DetailPageSkeleton />;
   }
 
   return (

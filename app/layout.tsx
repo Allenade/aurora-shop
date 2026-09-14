@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Manrope, Orbitron, Tektur } from "next/font/google";
+import { AppToaster } from "@/components/ui/toaster";
 import "./globals.css";
 
 const manrope = Manrope({
@@ -43,6 +44,7 @@ export default function RootLayout({
     >
       <body className="flex min-h-full flex-col font-sans text-foreground">
         {children}
+        <AppToaster />
       </body>
     </html>
   );

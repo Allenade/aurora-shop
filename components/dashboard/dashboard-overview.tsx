@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { toast } from "sonner";
 import { DashboardGreeting } from "@/components/dashboard/dashboard-greeting";
 import { QuickActions } from "@/components/dashboard/quick-actions";
 import { RecentPurchases } from "@/components/dashboard/recent-purchases";
@@ -9,9 +10,10 @@ import { BffRequestError } from "@/lib/bff/client";
 import { bffCall } from "@/lib/bff/generated/client";
 import type { BuyerDashboardResponse } from "@/lib/dashboard";
 import { useDashboardSession } from "@/lib/dashboard-session-store";
+import { BuyerDashboardSkeleton } from "@/components/ui/skeleton";
 
 export function DashboardOverview() {
-  const { stats, recentOrders, ready, error, isStale, apply, fail } =
+  const { stats, recentOrders, ready, isStale, apply, fail } =
     useDashboardSession();
 
   useEffect(() => {
@@ -29,11 +31,12 @@ export function DashboardOverview() {
         if (cancelled) return;
         // Keep showing cached data on soft-refresh failure
         if (ready) return;
-        fail(
+        const message =
           err instanceof BffRequestError
             ? err.message
-            : "Unable to load dashboard.",
-        );
+            : "Unable to load dashboard.";
+        fail(message);
+        toast.error(message);
       });
 
     return () => {
@@ -45,14 +48,8 @@ export function DashboardOverview() {
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
       <DashboardGreeting />
 
-      {error ? (
-        <p className="text-sm font-medium text-[#d64545]" role="alert">
-          {error}
-        </p>
-      ) : null}
-
       {!ready ? (
-        <p className="text-sm text-[#8a8a8a]">Loading overview…</p>
+        <BuyerDashboardSkeleton />
       ) : (
         <>
           <div className="grid gap-4 md:grid-cols-3">

@@ -1,15 +1,21 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { RestockItemModal } from '@/components/admin/restock-item-modal';
 import {
   type CatalogStatus,
   type InventoryItem,
 } from '@/lib/admin';
+import {
+  ADMIN_INVENTORY_INITIAL_KEY,
+  type AdminListInitialData,
+} from '@/lib/bff/admin-list';
 import { BffRequestError } from '@/lib/bff/client';
 import { bffCall } from '@/lib/bff/generated/client';
 import { toInventoryItem } from '@/lib/bff/map';
+import { stockStatusQueryParam } from '@/lib/domain/stock';
+import { TableSkeletonRows } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
 const PAGE_SIZE = 10;
@@ -24,11 +30,7 @@ type InventoryListResponse = {
 };
 
 function statusQueryParam(filter: (typeof FILTERS)[number]) {
-  if (filter === 'In Stock') return 'in_stock';
-  if (filter === 'Low Stock') return 'low_stock';
-  if (filter === 'Critical') return 'critical';
-  if (filter === 'Out of Stock') return 'out_of_stock';
-  return undefined;
+  return stockStatusQueryParam(filter === 'All Status' ? undefined : filter);
 }
 
 function statusClasses(status: CatalogStatus) {
@@ -143,14 +145,18 @@ function buildPageItems(current: number, total: number) {
   return items;
 }
 
-export function AdminInventory() {
-  const [items, setItems] = useState<InventoryItem[]>([]);
+export function AdminInventory({
+  initialData,
+}: {
+  initialData?: AdminListInitialData<InventoryItem>;
+}) {
+  const [items, setItems] = useState<InventoryItem[]>(initialData?.items ?? []);
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>('All Status');
   const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [pageCount, setPageCount] = useState(1);
+  const [total, setTotal] = useState(initialData?.total ?? 0);
+  const [pageCount, setPageCount] = useState(initialData?.pageCount ?? 1);
   const [restockingId, setRestockingId] = useState<string | null>(null);
   const [restocking, setRestocking] = useState(false);
   const [restockError, setRestockError] = useState<string | null>(null);
@@ -158,7 +164,12 @@ export function AdminInventory() {
   const [fetchState, setFetchState] = useState<{
     key: string | null;
     error: string | null;
-  }>({ key: null, error: null });
+  }>(() =>
+    initialData
+      ? { key: ADMIN_INVENTORY_INITIAL_KEY, error: initialData.error }
+      : { key: null, error: null },
+  );
+  const skipKeyRef = useRef(initialData ? ADMIN_INVENTORY_INITIAL_KEY : null);
 
   const fetchKey = `${debouncedQuery}\0${filter}\0${page}\0${reloadKey}`;
   const loading = fetchState.key !== fetchKey;
@@ -173,6 +184,11 @@ export function AdminInventory() {
   }, [query]);
 
   useEffect(() => {
+    if (skipKeyRef.current === fetchKey) {
+      skipKeyRef.current = null;
+      return;
+    }
+
     let cancelled = false;
     const key = fetchKey;
 
@@ -269,8 +285,6 @@ export function AdminInventory() {
         </p>
       ) : null}
 
-      {loading ? <p className="mb-4 text-sm text-[#8a8a8a]">Loading inventory…</p> : null}
-
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative min-w-0 flex-1">
           <span className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-[#9a9a9a]">
@@ -326,7 +340,9 @@ export function AdminInventory() {
               </tr>
             </thead>
             <tbody>
-              {items.length === 0 && !loading ? (
+              {loading && items.length === 0 ? (
+                <TableSkeletonRows columns={6} rows={PAGE_SIZE} />
+              ) : items.length === 0 && !loading ? (
                 <tr>
                   <td colSpan={6} className="py-16 text-center text-sm text-[#8a8a8a]">
                     No inventory items match this search.

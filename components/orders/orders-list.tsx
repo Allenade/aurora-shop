@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
+import { toast } from "sonner";
 import { OrderRow } from "@/components/orders/order-row";
 import { OrdersFilterTabs } from "@/components/orders/orders-filter-tabs";
 import { BffRequestError } from "@/lib/bff/client";
@@ -11,6 +12,8 @@ import {
   type OrderCounts,
 } from "@/lib/orders-session-store";
 import type { OrderFilter, OrderRecord } from "@/lib/orders";
+import { OrderListSkeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 10;
@@ -71,7 +74,6 @@ export function OrdersList() {
     setResolvedKey,
     markListFetched,
     isListStale,
-    error,
     setError,
     scrollY,
     setScrollY,
@@ -79,7 +81,8 @@ export function OrdersList() {
   } = useOrdersSession();
 
   const fetchKey = `${filter}\0${page}`;
-  const hasCache = resolvedKey === fetchKey && orders.length > 0;
+  // Empty lists are valid resolved results — don't require rows for cache hit.
+  const hasCache = resolvedKey === fetchKey;
   const loading = !hasCache;
 
   const ordersRef = useRef(orders);
@@ -143,14 +146,13 @@ export function OrdersList() {
   }, [countsLoaded, setCounts, setCountsLoaded]);
 
   useEffect(() => {
-    const cacheHit =
-      resolvedKey === fetchKey && ordersRef.current.length > 0;
-    // Fresh cache — keep UI as-is
+    const cacheHit = resolvedKey === fetchKey;
+    // Fresh cache (including empty lists) — keep UI as-is
     if (cacheHit && !isListStale()) return;
 
     let cancelled = false;
     const key = fetchKey;
-    const soft = cacheHit;
+    const soft = cacheHit && ordersRef.current.length > 0;
 
     void bffCall<OrdersListResponse>("listOrders", {
       query: {
@@ -182,15 +184,16 @@ export function OrdersList() {
         if (cancelled) return;
         // Soft refresh failure — keep cached rows
         if (soft) return;
+        const message =
+          err instanceof BffRequestError
+            ? err.message
+            : "Unable to load orders from the API.";
         setOrders([]);
         setTotal(0);
         setPageCount(1);
         setResolvedKey(key);
-        setError(
-          err instanceof BffRequestError
-            ? err.message
-            : "Unable to load orders from the API.",
-        );
+        setError(message);
+        toast.error(message);
       });
 
     return () => {
@@ -235,15 +238,6 @@ export function OrdersList() {
         </p>
       </div>
 
-      {error ? (
-        <p
-          className="mb-4 rounded-xl border border-[#f0b4b4] bg-[#fff5f5] px-4 py-3 text-sm text-[#d64545]"
-          role="alert"
-        >
-          {error}
-        </p>
-      ) : null}
-
       <div className="rounded-2xl border border-[#e5e5e5] bg-white">
         <div className="border-b border-[#ececec] px-5 pt-5 pb-4 sm:px-6">
           <OrdersFilterTabs
@@ -255,26 +249,24 @@ export function OrdersList() {
 
         <div className="px-5 sm:px-6">
           {loading && orders.length === 0 ? (
-            <div className="py-16 text-center text-sm text-[#8a8a8a]">
-              Loading orders…
-            </div>
+            <OrderListSkeleton rows={PAGE_SIZE} />
           ) : !loading && orders.length === 0 ? (
-            <div className="py-16 text-center text-sm text-[#8a8a8a]">
-              No orders in this filter.
+            <div className="py-10">
+              <EmptyState description="No orders in this filter." />
             </div>
           ) : orders.length > 0 ? (
-            <>
-              {loading ? (
-                <p className="pt-4 text-sm text-[#8a8a8a]">Updating…</p>
-              ) : null}
-              <ul className="divide-y divide-[#ececec]">
-                {orders.map((order) => (
-                  <li key={order.id}>
-                    <OrderRow order={order} />
-                  </li>
-                ))}
-              </ul>
-            </>
+            <ul
+              className={cn(
+                "divide-y divide-[#ececec]",
+                loading && "opacity-60",
+              )}
+            >
+              {orders.map((order) => (
+                <li key={order.id}>
+                  <OrderRow order={order} />
+                </li>
+              ))}
+            </ul>
           ) : null}
         </div>
 

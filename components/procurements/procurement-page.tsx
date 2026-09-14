@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { NeedAssistanceCard } from "@/components/procurements/need-assistance";
 import {
   QuoteRequestForm,
@@ -11,6 +12,7 @@ import {
   type SubmittedQuote,
 } from "@/components/procurements/quote-submitted";
 import { RecentQuotes } from "@/components/procurements/recent-quotes";
+import { ProcurementPageSkeleton } from "@/components/ui/skeleton";
 import { BffRequestError } from "@/lib/bff/client";
 import { bffCall } from "@/lib/bff/generated/client";
 import { createQuoteReferenceId, type RecentQuote } from "@/lib/procurements";
@@ -22,15 +24,12 @@ function errorMessage(err: unknown, fallback: string) {
 }
 
 export function ProcurementPage() {
-  const { quotes, loaded, error, isStale, apply, fail } =
-    useProcurementSession();
+  const { quotes, loaded, isStale, apply, fail } = useProcurementSession();
   const [editingQuote, setEditingQuote] = useState<RecentQuote | null>(null);
   const [submittedQuote, setSubmittedQuote] = useState<SubmittedQuote | null>(
     null,
   );
   const [formKey, setFormKey] = useState(0);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   function refreshQuotes() {
@@ -42,7 +41,7 @@ export function ProcurementPage() {
         const message = errorMessage(err, "Unable to load quotes.");
         if (!loaded) {
           fail(message);
-          setActionError(message);
+          toast.error(message);
         }
       });
   }
@@ -57,8 +56,6 @@ export function ProcurementPage() {
     form: QuoteFormState,
     currentEditing: RecentQuote | null,
   ) {
-    setActionError(null);
-    setActionMessage(null);
     setBusy(true);
 
     try {
@@ -69,7 +66,7 @@ export function ProcurementPage() {
         });
         setEditingQuote(null);
         setFormKey((k) => k + 1);
-        setActionMessage(`Quote ${currentEditing.id} updated.`);
+        toast.success(`Quote ${currentEditing.id} updated.`);
         refreshQuotes();
         return;
       }
@@ -84,6 +81,7 @@ export function ProcurementPage() {
           ...form,
           referenceNumber: updated?.id ?? currentEditing.id,
         });
+        toast.success("Quote request submitted.");
         refreshQuotes();
         window.scrollTo({ top: 0, behavior: "smooth" });
         return;
@@ -98,10 +96,11 @@ export function ProcurementPage() {
       if (created?.id) {
         setSubmittedQuote({ ...form, referenceNumber: created.id });
       }
+      toast.success("Quote request submitted.");
       refreshQuotes();
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
-      setActionError(errorMessage(err, "Unable to submit quote request."));
+      toast.error(errorMessage(err, "Unable to submit quote request."));
     } finally {
       setBusy(false);
     }
@@ -111,8 +110,6 @@ export function ProcurementPage() {
     form: QuoteFormState,
     currentEditing: RecentQuote | null,
   ) {
-    setActionError(null);
-    setActionMessage(null);
     setBusy(true);
 
     const editableId =
@@ -129,7 +126,7 @@ export function ProcurementPage() {
         });
         setEditingQuote(null);
         setFormKey((k) => k + 1);
-        setActionMessage(
+        toast.success(
           `Draft ${updated?.id ?? currentEditing?.id ?? ""} saved.`,
         );
         refreshQuotes();
@@ -141,12 +138,12 @@ export function ProcurementPage() {
       });
       setEditingQuote(null);
       setFormKey((k) => k + 1);
-      setActionMessage(
+      toast.success(
         created?.id ? `Draft ${created.id} saved.` : "Draft saved.",
       );
       refreshQuotes();
     } catch (err) {
-      setActionError(errorMessage(err, "Unable to save draft."));
+      toast.error(errorMessage(err, "Unable to save draft."));
       refreshQuotes();
     } finally {
       setBusy(false);
@@ -155,8 +152,6 @@ export function ProcurementPage() {
 
   function handleSubmitAnother() {
     setSubmittedQuote(null);
-    setActionError(null);
-    setActionMessage(null);
     setFormKey((k) => k + 1);
   }
 
@@ -171,7 +166,9 @@ export function ProcurementPage() {
     );
   }
 
-  const listError = actionError ?? error;
+  if (!loaded) {
+    return <ProcurementPageSkeleton />;
+  }
 
   return (
     <div className="mx-auto w-full max-w-6xl">
@@ -184,26 +181,12 @@ export function ProcurementPage() {
         </p>
       </div>
 
-      {listError ? (
-        <p className="mb-4 text-sm font-medium text-[#d64545]" role="alert">
-          {listError}
-        </p>
-      ) : null}
-      {actionMessage ? (
-        <p className="mb-4 text-sm font-medium text-[#1f9d57]" role="status">
-          {actionMessage}
-        </p>
-      ) : null}
-
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1.55fr)_minmax(280px,0.85fr)]">
         <QuoteRequestForm
           key={editingQuote?.id ?? `new-quote-${formKey}`}
           editingQuote={editingQuote}
           busy={busy}
-          onClearEdit={() => {
-            setEditingQuote(null);
-            setActionError(null);
-          }}
+          onClearEdit={() => setEditingQuote(null)}
           onSubmitted={handleSubmitted}
           onSaveDraft={handleSaveDraft}
         />
@@ -214,8 +197,6 @@ export function ProcurementPage() {
             editingId={editingQuote?.id ?? null}
             onEdit={(quote) => {
               if (quote.status !== "Pending" && quote.status !== "Draft") return;
-              setActionError(null);
-              setActionMessage(null);
               setEditingQuote(quote);
               window.scrollTo({ top: 0, behavior: "smooth" });
             }}
