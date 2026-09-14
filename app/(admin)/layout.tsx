@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import { AdminShell } from "@/components/layout/admin-shell";
 import { AdminProviders } from "@/components/providers/admin-providers";
-import { getCurrentUser } from "@/lib/bff/auth";
+import { requireAdminUser } from "@/lib/bff/guards";
 
 export const metadata: Metadata = {
   title: {
@@ -16,9 +15,7 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const user = await getCurrentUser();
-  if (!user) redirect("/auth/signin");
-  if (user.type !== "admin") redirect("/dashboard");
+  const user = await requireAdminUser();
 
   return (
     <AdminProviders user={user}>

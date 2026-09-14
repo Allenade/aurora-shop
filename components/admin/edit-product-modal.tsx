@@ -3,6 +3,7 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { bffCall } from '@/lib/bff/generated/client';
+import { catalogStatusLabel, quantityForCatalogStatus } from '@/lib/domain/stock';
 import {
   CATALOG_CATEGORIES,
   CATALOG_STATUS_OPTIONS,
@@ -49,14 +50,16 @@ function toFormState(product: CatalogProduct): EditFormState {
       : product.image
         ? [product.image]
         : [];
+  const stock = product.stock;
+  const minStock = product.minStock;
   return {
     name: product.name,
     sku: product.sku,
     category: product.category,
     price: parseCatalogPrice(product.priceLabel),
-    stock: String(product.stock),
-    minStock: String(product.minStock),
-    status: product.status,
+    stock: String(stock),
+    minStock: String(minStock),
+    status: catalogStatusLabel(stock, minStock),
     specs: product.specs ?? product.description,
     images,
   };
@@ -134,7 +137,24 @@ export function EditProductModal({ mode, product, onClose, onSave }: EditProduct
   }, [onClose]);
 
   function updateField<K extends keyof EditFormState>(key: K, value: EditFormState[K]) {
-    setForm((prev) => ({ ...prev, [key]: value }));
+    setForm((prev) => {
+      const next: EditFormState = { ...prev, [key]: value };
+
+      if (key === 'stock' || key === 'minStock') {
+        const stock = Number(key === 'stock' ? value : next.stock) || 0;
+        const minStock = Number(key === 'minStock' ? value : next.minStock) || 0;
+        next.status = catalogStatusLabel(stock, minStock);
+      }
+
+      if (key === 'status') {
+        const minStock = Number(next.minStock) || 0;
+        next.stock = String(
+          quantityForCatalogStatus(value as CatalogStatus, minStock),
+        );
+      }
+
+      return next;
+    });
   }
 
   async function handleImageUpload(e: ChangeEvent<HTMLInputElement>) {
@@ -379,6 +399,10 @@ export function EditProductModal({ mode, product, onClose, onSave }: EditProduct
                     </option>
                   ))}
                 </select>
+                <p className="mt-1.5 text-xs text-[#8a8a8a]">
+                  Status is derived from stock qty and the low-stock threshold. Changing
+                  status updates quantity to match.
+                </p>
               </div>
             </div>
 

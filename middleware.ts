@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE } from "@/lib/bff/config";
+import { unsealSessionEdge } from "@/lib/bff/session-edge";
 
 function isPublicPath(pathname: string) {
   if (pathname === "/") return true;
@@ -16,10 +17,10 @@ function isPublicPath(pathname: string) {
 }
 
 /**
- * Edge-safe gate: require the httpOnly session cookie.
- * Signature/expiry are validated in Node (getCurrentUser / API routes).
+ * Edge gate: require a valid sealed session (signature + expiry).
+ * Admin routes additionally require typ=admin (Nest remains source of truth for data).
  */
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (isPublicPath(pathname)) {
@@ -34,6 +35,31 @@ export function middleware(request: NextRequest) {
     const signIn = new URL("/auth/signin", request.url);
     signIn.searchParams.set("next", pathname);
     return NextResponse.redirect(signIn);
+  }
+
+  const session = await unsealSessionEdge(token);
+  if (!session) {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
+    const signIn = new URL("/auth/signin", request.url);
+    signIn.searchParams.set("reason", "session_expired");
+    if (pathname !== "/auth/signin") {
+      signIn.searchParams.set("next", pathname);
+    }
+    const response = NextResponse.redirect(signIn);
+    response.cookies.set(SESSION_COOKIE, "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 0,
+    });
+    return response;
+  }
+
+  if (pathname.startsWith("/admin") && session.typ !== "admin") {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
   return NextResponse.next();

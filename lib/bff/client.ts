@@ -29,6 +29,16 @@ export class BffRequestError extends Error {
   }
 }
 
+function isAuthCredentialRequest(path: string) {
+  return (
+    path.startsWith("/api/auth/login") ||
+    path.startsWith("/api/auth/register") ||
+    path.startsWith("/api/auth/verify") ||
+    path.startsWith("/api/auth/resend") ||
+    path.startsWith("/api/auth/logout")
+  );
+}
+
 /** Browser → Next BFF. Always same-origin; cookies sent automatically. */
 export async function bffFetch<T>(
   path: string,
@@ -45,6 +55,11 @@ export async function bffFetch<T>(
 
   const body = await parseJson<T & ApiErrorBody>(res);
   if (!res.ok) {
+    if (res.status === 401 && !isAuthCredentialRequest(path)) {
+      void import("@/lib/session-expiry").then(({ handleSessionExpired }) => {
+        handleSessionExpired();
+      });
+    }
     throw new BffRequestError(
       body?.message ?? "Request failed",
       res.status,
@@ -57,6 +72,12 @@ export async function bffFetch<T>(
 export type LoginResponse = {
   user: SessionUser;
   redirectTo: string;
+};
+
+export type MeResponse = {
+  user: SessionUser;
+  /** Unix seconds — sealed cookie expiry (for client timeout watch). */
+  expiresAt: number | null;
 };
 
 export function loginRequest(input: {
@@ -75,7 +96,7 @@ export function logoutRequest() {
 }
 
 export function meRequest() {
-  return bffFetch<{ user: SessionUser }>("/api/auth/me");
+  return bffFetch<MeResponse>("/api/auth/me");
 }
 
 export function registerRequest(input: Record<string, unknown>) {

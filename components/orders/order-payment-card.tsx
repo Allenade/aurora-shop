@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { CopyTrackingButton } from "@/components/ui/copy-tracking-button";
 import type { OrderRecord } from "@/lib/orders";
 
 function paymentTone(status: OrderRecord["paymentStatus"]) {
@@ -28,13 +29,17 @@ export function OrderPaymentCard({ order }: { order: OrderRecord }) {
         </div>
         <div className="flex items-center justify-between gap-4">
           <dt className="text-[#6b7280]">Tracking Number</dt>
-          <dd>
+          <dd className="flex items-center gap-2.5">
             <Link
               href={`/track-orders?q=${encodeURIComponent(order.trackingNumber)}`}
               className="font-medium text-[#2f6fed] underline-offset-2 hover:underline"
             >
               {order.trackingNumber}
             </Link>
+            <CopyTrackingButton
+              trackingNumber={order.trackingNumber}
+              className="text-xs"
+            />
           </dd>
         </div>
       </dl>

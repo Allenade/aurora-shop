@@ -3,7 +3,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
-import { CopyTrackingButton } from "@/components/cart/copy-tracking-button";
+import { TrackOrderButton } from "@/components/orders/track-order-button";
+import { CopyTrackingButton } from "@/components/ui/copy-tracking-button";
 import {
   formatCartMoney,
   VAT_RATE,
@@ -164,12 +165,10 @@ export function OrderPlacedSuccess({
       </div>
 
       <div className="mt-6 flex w-full flex-col gap-2.5 sm:flex-row">
-        <Link
-          href={`/track-orders?q=${encodeURIComponent(trackingNumber)}`}
-          className="inline-flex h-11 flex-1 items-center justify-center rounded-lg bg-aurora-lime px-4 text-sm font-semibold text-aurora-ink transition-opacity hover:opacity-90"
-        >
-          Track Order
-        </Link>
+        <TrackOrderButton
+          trackingNumber={trackingNumber}
+          className="h-11 flex-1 bg-aurora-lime px-4 transition-opacity hover:opacity-90"
+        />
         <Link
           href="/shop"
           className="inline-flex h-11 flex-1 items-center justify-center rounded-lg border border-[#d0d0d0] bg-white px-4 text-sm font-semibold text-aurora-ink transition-colors hover:bg-[#f7f7f7]"

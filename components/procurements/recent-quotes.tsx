@@ -1,6 +1,8 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { QuoteStatus, RecentQuote } from "@/lib/procurements";
 import { cn } from "@/lib/utils";
 
@@ -38,17 +40,39 @@ type RecentQuotesProps = {
   quotes: RecentQuote[];
   onEdit: (quote: RecentQuote) => void;
   editingId?: string | null;
+  loading?: boolean;
 };
 
 export function RecentQuotes({
   quotes,
   onEdit,
   editingId = null,
+  loading = false,
 }: RecentQuotesProps) {
   return (
     <div className="rounded-2xl border border-[#e5e5e5] bg-white p-5">
       <h2 className="text-base font-bold text-aurora-ink">Recent Quotes</h2>
 
+      {loading && quotes.length === 0 ? (
+        <ul className="mt-4 flex flex-col gap-3" aria-busy="true" aria-label="Loading quotes">
+          {Array.from({ length: 3 }, (_, i) => (
+            <li key={i} className="rounded-xl border border-[#ececec] px-3.5 py-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-28" />
+                  <Skeleton className="h-3 w-full" />
+                </div>
+                <Skeleton className="h-6 w-16 rounded-full" />
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : quotes.length === 0 ? (
+        <EmptyState
+          className="mt-4"
+          description="No quote requests yet. Submit a request to see it here."
+        />
+      ) : (
       <ul className="mt-4 flex flex-col gap-3">
         {quotes.map((quote) => {
           const isEditing = editingId === quote.id;
@@ -101,6 +125,7 @@ export function RecentQuotes({
           );
         })}
       </ul>
+      )}
     </div>
   );
 }

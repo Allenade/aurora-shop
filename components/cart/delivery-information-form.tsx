@@ -41,7 +41,7 @@ export function DeliveryInformationForm({
   onDeliveryChange,
 }: DeliveryInformationFormProps) {
   return (
-    <div className="rounded-2xl border border-[#e5e5e5] bg-white p-5 sm:p-6">
+    <div className="w-full min-w-0 rounded-2xl border border-[#e5e5e5] bg-white p-5 sm:p-6">
       <h2 className="text-base font-bold text-aurora-ink">
         Delivery Information
       </h2>

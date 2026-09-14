@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { AdminGreeting } from "@/components/admin/admin-greeting";
 import { AdminOrderBreakdown } from "@/components/admin/admin-order-breakdown";
 import { AdminOrderDetailDrawer } from "@/components/admin/admin-order-detail-drawer";
@@ -21,6 +21,7 @@ import { bffCall } from "@/lib/bff/generated/client";
 import { fulfillmentStatus, toAdminOrder } from "@/lib/bff/map";
 import type { OrderRecord } from "@/lib/orders";
 import type { SessionUser } from "@/lib/permissions/permissions.types";
+import { OverviewSkeleton } from "@/components/ui/skeleton";
 
 type OverviewResponse = {
   stats?: AdminStat[];
@@ -94,11 +95,6 @@ export function AdminOverview() {
     };
   }, []);
 
-  const emptyHint = useMemo(() => {
-    if (loading) return "Loading overview…";
-    return null;
-  }, [loading]);
-
   function handleStatusChange(status: AdminOrderStatus) {
     if (!selectedOrder?.internalId) {
       setSelectedOrder((prev) => (prev ? { ...prev, status } : prev));
@@ -132,45 +128,49 @@ export function AdminOverview() {
         </p>
       ) : null}
 
-      {emptyHint ? (
-        <p className="text-sm text-[#8a8a8a]">{emptyHint}</p>
-      ) : null}
+      {loading ? (
+        <OverviewSkeleton />
+      ) : (
+        <>
+          <AdminStats stats={stats} />
 
-      <AdminStats stats={stats} />
-
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.85fr)]">
-        <AdminRecentOrders
-          orders={recentOrders}
-          onOpenOrder={(recent) => {
-            void bffCall<OrderRecord>("getOrder", { params: { id: recent.id } })
-              .then((order) => setSelectedOrder(toAdminOrder(order)))
-              .catch(() =>
-                setSelectedOrder({
-                  id: recent.id,
-                  internalId: recent.internalId,
-                  customer: recent.customer,
-                  email: "",
-                  initials: recent.customer
-                    .split(" ")
-                    .map((part) => part[0] ?? "")
-                    .join("")
-                    .slice(0, 2)
-                    .toUpperCase(),
-                  items: 1,
-                  amount: recent.amount,
-                  total: recent.amount,
-                  payment: "Bank Transfer",
-                  status: recent.status,
-                  date: recent.date,
-                }),
-              );
-          }}
-        />
-        <div className="flex flex-col gap-5">
-          <AdminStockAlerts alerts={alerts} />
-          <AdminOrderBreakdown items={breakdown} />
-        </div>
-      </div>
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.85fr)]">
+            <AdminRecentOrders
+              orders={recentOrders}
+              onOpenOrder={(recent) => {
+                void bffCall<OrderRecord>("getOrder", {
+                  params: { id: recent.id },
+                })
+                  .then((order) => setSelectedOrder(toAdminOrder(order)))
+                  .catch(() =>
+                    setSelectedOrder({
+                      id: recent.id,
+                      internalId: recent.internalId,
+                      customer: recent.customer,
+                      email: "",
+                      initials: recent.customer
+                        .split(" ")
+                        .map((part) => part[0] ?? "")
+                        .join("")
+                        .slice(0, 2)
+                        .toUpperCase(),
+                      items: 1,
+                      amount: recent.amount,
+                      total: recent.amount,
+                      payment: "Bank Transfer",
+                      status: recent.status,
+                      date: recent.date,
+                    }),
+                  );
+              }}
+            />
+            <div className="flex flex-col gap-5">
+              <AdminStockAlerts alerts={alerts} />
+              <AdminOrderBreakdown items={breakdown} />
+            </div>
+          </div>
+        </>
+      )}
 
       {selectedOrder ? (
         <AdminOrderDetailDrawer

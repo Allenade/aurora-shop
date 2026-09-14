@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import { SearchInput } from "@/components/ui/search-input";
 import { UserMenu } from "@/components/layout/user-menu";
 import { useCartOptional } from "@/lib/cart-store";
@@ -35,6 +37,45 @@ function BellIcon() {
   );
 }
 
+type TopBarSearchProps = {
+  searchPath: string;
+};
+
+function TopBarSearch({ searchPath }: TopBarSearchProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const onSearchPage =
+    pathname === searchPath || pathname.startsWith(`${searchPath}/`);
+  const urlQuery = onSearchPage ? (searchParams.get("q")?.trim() ?? "") : "";
+
+  const [value, setValue] = useState(urlQuery);
+
+  useEffect(() => {
+    setValue(urlQuery);
+  }, [urlQuery]);
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const q = value.trim();
+    const href = q
+      ? `${searchPath}?q=${encodeURIComponent(q)}`
+      : searchPath;
+    router.push(href);
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="w-full" role="search">
+      <SearchInput
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="Search for components, parts, categories..."
+        aria-label="Search products"
+      />
+    </form>
+  );
+}
+
 type TopBarProps = {
   /** Admin chrome hides the cart. */
   showCart?: boolean;
@@ -47,15 +88,23 @@ export function TopBar({
 }: TopBarProps) {
   const cart = useCartOptional();
   const count = showCart ? (cart?.itemCount ?? 0) : 0;
+  const searchPath = showCart ? "/shop" : "/admin/products";
 
   return (
-    <header className="flex h-[72px] shrink-0 items-center border-b border-[#ececec] bg-white px-6">
-      <div className="mx-auto flex w-full max-w-6xl items-center gap-4">
-        <div className="w-full max-w-xl">
-          <SearchInput
-            placeholder="Search for components, parts, categories..."
-            aria-label="Search"
-          />
+    <header className="flex h-[72px] shrink-0 items-center border-b border-[#ececec] bg-white px-4 sm:px-6">
+      <div className="mx-auto flex w-full max-w-6xl items-center gap-3 sm:gap-4">
+        <div className="min-w-0 w-full max-w-xl">
+          <Suspense
+            fallback={
+              <SearchInput
+                placeholder="Search for components, parts, categories..."
+                aria-label="Search products"
+                disabled
+              />
+            }
+          >
+            <TopBarSearch searchPath={searchPath} />
+          </Suspense>
         </div>
 
         <div className="ml-auto flex shrink-0 items-center gap-2">

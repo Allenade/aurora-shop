@@ -3,8 +3,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect } from "react";
 import { AdminFooterCard } from "@/components/layout/admin-footer-card";
 import { NavIcon } from "@/components/layout/nav-icons";
+import { sidebarAsideClassName } from "@/components/layout/shell-with-sidebar";
 import { useSidebar } from "@/components/layout/sidebar-context";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { Can, usePermission } from "@/lib/permissions";
@@ -37,17 +39,22 @@ function CollapseIcon({ collapsed }: { collapsed: boolean }) {
 
 export function AdminSidebar() {
   const pathname = usePathname();
-  const { collapsed, toggle } = useSidebar();
+  const { collapsed, toggle, setCollapsed } = useSidebar();
   const { user } = usePermission();
   const email = user?.email ?? "admin@regaliaelectrical.ng";
   const roleName = user?.roles[0]?.name ?? "Super Admin";
 
+  // Close mobile drawer after navigation.
+  useEffect(() => {
+    if (window.matchMedia("(max-width: 1023px)").matches) {
+      setCollapsed(true);
+    }
+  }, [pathname, setCollapsed]);
+
   return (
     <aside
-      className={cn(
-        "flex h-full shrink-0 flex-col border-r border-[#ececec] bg-white py-4 transition-[width] duration-200 ease-out",
-        collapsed ? "w-[76px] px-2.5" : "w-[260px] px-4",
-      )}
+      className={sidebarAsideClassName(collapsed)}
+      aria-label="Admin navigation"
     >
       <div
         className={cn(

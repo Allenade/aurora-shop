@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 import { ProductCard } from "@/components/shop/product-card";
 import {
   ShopFilters,
@@ -14,6 +16,10 @@ import {
   useShopSession,
 } from "@/lib/shop-session-store";
 import { SHOP_PRICE_MIN, type ShopProduct } from "@/lib/shop";
+import {
+  ProductGridSkeleton,
+  ShopFiltersSkeleton,
+} from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 10;
@@ -54,9 +60,10 @@ function buildPageItems(current: number, totalPages: number) {
 function buildQuery(
   filters: ShopFilterState,
   priceFilterEnabled: boolean,
-  opts: { page: number; limit: number; seed: string },
+  opts: { page: number; limit: number; seed: string; q?: string },
 ) {
   return {
+    q: opts.q || undefined,
     category:
       filters.categories.length > 0 ? filters.categories.join(",") : undefined,
     brand: filters.brands.length > 0 ? filters.brands.join(",") : undefined,
@@ -69,7 +76,10 @@ function buildQuery(
   };
 }
 
-export function ShopCatalog() {
+function ShopCatalogContent() {
+  const searchParams = useSearchParams();
+  const searchQuery = searchParams.get("q")?.trim() ?? "";
+
   const session = useShopSession();
   const {
     filters,
@@ -94,7 +104,8 @@ export function ShopCatalog() {
     setCategoryOptions,
     brandOptions,
     setBrandOptions,
-    error,
+    facetsReady,
+    setFacetsReady,
     setError,
     listSession,
     setListSession,
@@ -107,15 +118,14 @@ export function ShopCatalog() {
   const [debouncedPriceFilter, setDebouncedPriceFilter] =
     useState(priceFilterEnabled);
 
-  const filterKey = shopFilterKey(debouncedFilters, debouncedPriceFilter);
-
-  if (listSession.filterKey !== filterKey) {
-    setListSession({ filterKey, seed: createShopSeed() });
-    if (page !== 1) setPage(1);
-  }
-
+  const filterKey = shopFilterKey(
+    debouncedFilters,
+    debouncedPriceFilter,
+    searchQuery,
+  );
   const listKey = `${listSession.filterKey}|${listSession.seed}|p${page}`;
-  const loading = resolvedKey !== listKey;
+  const filtersSynced = listSession.filterKey === filterKey;
+  const loading = !filtersSynced || resolvedKey !== listKey;
 
   const productsRef = useRef(products);
   const scrollRestoredRef = useRef(false);
@@ -131,6 +141,13 @@ export function ShopCatalog() {
     }, 300);
     return () => window.clearTimeout(timer);
   }, [filters, priceFilterEnabled]);
+
+  // Keep list session in sync with debounced filters + search (never during render).
+  useEffect(() => {
+    if (listSession.filterKey === filterKey) return;
+    setListSession({ filterKey, seed: createShopSeed() });
+    setPage(1);
+  }, [filterKey, listSession.filterKey, setListSession, setPage]);
 
   // Restore scroll when returning with cached results
   useEffect(() => {
@@ -160,6 +177,9 @@ export function ShopCatalog() {
   }, [setScrollY]);
 
   useEffect(() => {
+    // Wait until listSession matches the debounced filter key.
+    if (listSession.filterKey !== filterKey) return;
+
     // Already have this page in memory — don't blank or refetch
     if (resolvedKey === listKey && productsRef.current.length > 0) {
       return;
@@ -170,6 +190,7 @@ export function ShopCatalog() {
     const activeFilters = debouncedFilters;
     const activePriceFilter = debouncedPriceFilter;
     const activePage = page;
+    const activeQuery = searchQuery;
     const key = `${activeSession.filterKey}|${activeSession.seed}|p${activePage}`;
 
     void bffCall<ProductsListResponse>("listProducts", {
@@ -177,6 +198,7 @@ export function ShopCatalog() {
         page: activePage,
         limit: PAGE_SIZE,
         seed: activeSession.seed,
+        q: activeQuery,
       }),
     })
       .then((res) => {
@@ -196,11 +218,22 @@ export function ShopCatalog() {
             typeof res.catalogMaxPrice === "number" &&
             res.catalogMaxPrice > 0
           ) {
-            setCatalogMaxPrice(res.catalogMaxPrice);
-            setFilters((prev) => {
-              if (prev.maxPrice === res.catalogMaxPrice) return prev;
-              return { ...prev, maxPrice: res.catalogMaxPrice! };
-            });
+            const nextCatalogMax = res.catalogMaxPrice;
+            setCatalogMaxPrice(nextCatalogMax);
+            // Only seed the slider ceiling before the user moves it.
+            // Never overwrite an active price filter — that snapped the thumb
+            // back to catalog max on every refetch.
+            if (!activePriceFilter) {
+              setFilters((prev) => {
+                if (prev.maxPrice === nextCatalogMax) return prev;
+                return { ...prev, maxPrice: nextCatalogMax };
+              });
+            } else {
+              setFilters((prev) => {
+                if (prev.maxPrice <= nextCatalogMax) return prev;
+                return { ...prev, maxPrice: nextCatalogMax };
+              });
+            }
           }
           if (Array.isArray(res.categories) && res.categories.length > 0) {
             setCategoryOptions(res.categories);
@@ -216,26 +249,37 @@ export function ShopCatalog() {
         setProducts(rows);
         cacheProducts(rows);
         setResolvedKey(key);
+        setFacetsReady(true);
         setError(null);
       })
       .catch((err) => {
         if (cancelled) return;
+        const message =
+          err instanceof BffRequestError
+            ? err.message
+            : "Unable to load products from the API.";
         setProducts([]);
         setTotal(0);
         setPageCount(1);
         setResolvedKey(key);
-        setError(
-          err instanceof BffRequestError
-            ? err.message
-            : "Unable to load products from the API.",
-        );
+        setFacetsReady(true);
+        setError(message);
+        toast.error(message);
       });
 
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listKey, debouncedFilters, debouncedPriceFilter, listSession, page]);
+  }, [
+    listKey,
+    filterKey,
+    debouncedFilters,
+    debouncedPriceFilter,
+    listSession,
+    page,
+    searchQuery,
+  ]);
 
   function handleFiltersChange(next: ShopFilterState) {
     if (next.maxPrice !== filters.maxPrice) {
@@ -266,14 +310,18 @@ export function ShopCatalog() {
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 lg:flex-row lg:items-start">
-      <aside className="w-full shrink-0 lg:w-[260px]">
-        <ShopFilters
-          value={filters}
-          onChange={handleFiltersChange}
-          categories={categoryOptions}
-          brands={brandOptions}
-          priceMax={Math.max(catalogMaxPrice, SHOP_PRICE_MIN, 1)}
-        />
+      <aside className="w-full shrink-0 lg:sticky lg:top-0 lg:max-h-[calc(100dvh-72px-3rem)] lg:w-[260px] lg:self-start lg:overflow-y-auto">
+        {!facetsReady ? (
+          <ShopFiltersSkeleton />
+        ) : (
+          <ShopFilters
+            value={filters}
+            onChange={handleFiltersChange}
+            categories={categoryOptions}
+            brands={brandOptions}
+            priceMax={Math.max(catalogMaxPrice, SHOP_PRICE_MIN, 1)}
+          />
+        )}
       </aside>
 
       <section className="min-w-0 flex-1">
@@ -283,7 +331,9 @@ export function ShopCatalog() {
               All Components
             </h1>
             <p className="mt-1 text-sm text-[#8a8a8a]">
-              Browse our complete catalog of electronics components.
+              {searchQuery
+                ? `Results for “${searchQuery}”`
+                : "Browse our complete catalog of electronics components."}
               {!loading && total > 0 ? ` · ${total} products` : null}
             </p>
           </div>
@@ -364,28 +414,34 @@ export function ShopCatalog() {
           </div>
         </div>
 
-        {error ? (
-          <p
-            className="mb-4 rounded-xl border border-[#f0b4b4] bg-[#fff5f5] px-4 py-3 text-sm text-[#d64545]"
-            role="alert"
-          >
-            {error}
-          </p>
-        ) : null}
-
         {showLoadingBanner ? (
-          <p className="mb-4 text-sm text-[#8a8a8a]">Loading products…</p>
+          <ProductGridSkeleton count={6} view={view} />
         ) : null}
 
         {loading && showProducts ? (
-          <p className="mb-4 text-sm text-[#8a8a8a]">Updating results…</p>
+          <div className="relative mb-4 opacity-60">
+            <div
+              className={cn(
+                "grid gap-4",
+                view === "grid"
+                  ? "sm:grid-cols-2 xl:grid-cols-3"
+                  : "grid-cols-1",
+              )}
+            >
+              {products.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
+          </div>
         ) : null}
 
         {!loading && !showProducts ? (
           <div className="rounded-2xl border border-dashed border-[#d9d9d9] bg-white px-6 py-16 text-center text-sm text-[#8a8a8a]">
-            No components match your filters.
+            {searchQuery
+              ? `No components match “${searchQuery}”.`
+              : "No components match your filters."}
           </div>
-        ) : showProducts ? (
+        ) : !loading && showProducts ? (
           <>
             <div
               className={cn(
@@ -433,7 +489,7 @@ export function ShopCatalog() {
                             item === currentPage ? "page" : undefined
                           }
                           className={cn(
-                            "inline-flex size-9 items-center justify-center rounded-lg text-sm font-semibold",
+                            "inline-flex size-9 items-center justify-center rounded-lg text-sm font-medium",
                             item === currentPage
                               ? "bg-aurora-lime text-aurora-ink"
                               : "border border-[#e0e0e0] text-[#6b7280] hover:bg-[#f7f7f7]",
@@ -447,7 +503,7 @@ export function ShopCatalog() {
                       type="button"
                       disabled={currentPage >= pageCount || loading}
                       onClick={() => goToPage(currentPage + 1)}
-                      className="h-9 rounded-lg border border-[#e0e0e0] bg-white px-3 text-sm font-semibold text-aurora-ink hover:bg-[#f7f7f7] disabled:cursor-not-allowed disabled:opacity-40"
+                      className="h-9 rounded-lg border border-[#e0e0e0] px-3 text-sm font-medium text-[#6b7280] hover:bg-[#f7f7f7] disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       Next
                     </button>
@@ -459,5 +515,24 @@ export function ShopCatalog() {
         ) : null}
       </section>
     </div>
+  );
+}
+
+export function ShopCatalog() {
+  return (
+    <Suspense
+      fallback={
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 lg:flex-row lg:items-start">
+          <aside className="w-full shrink-0 lg:w-[260px]">
+            <ShopFiltersSkeleton />
+          </aside>
+          <section className="min-w-0 flex-1">
+            <ProductGridSkeleton count={6} />
+          </section>
+        </div>
+      }
+    >
+      <ShopCatalogContent />
+    </Suspense>
   );
 }

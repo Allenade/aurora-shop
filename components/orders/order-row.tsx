@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { TrackOrderButton } from "@/components/orders/track-order-button";
 import { Badge } from "@/components/ui/badge";
 import { bffCall } from "@/lib/bff/generated/client";
 import { useCart } from "@/lib/cart-store";
@@ -160,12 +161,10 @@ export function OrderRow({ order }: { order: OrderRecord }) {
               {busy ? "Adding…" : "Re-order"}
             </button>
           ) : order.status !== "Cancelled" ? (
-            <Link
-              href={`/track-orders?q=${encodeURIComponent(order.trackingNumber)}`}
-              className="inline-flex h-9 items-center justify-center whitespace-nowrap rounded-lg border border-[#d0d0d0] bg-white px-3.5 text-sm font-semibold text-aurora-ink transition-colors hover:bg-[#f7f7f7]"
-            >
-              Track Order
-            </Link>
+            <TrackOrderButton
+              trackingNumber={order.trackingNumber}
+              className="h-9 border border-[#d0d0d0] bg-white px-3.5 transition-colors hover:bg-[#f7f7f7]"
+            />
           ) : null}
         </div>
 

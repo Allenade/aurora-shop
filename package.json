@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3000",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 3000",
     "lint": "eslint",
     "typecheck": "tsc --noEmit"
   },
@@ -17,7 +17,8 @@
     "chowbea-axios": "^2.7.1",
     "next": "16.2.11",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "sonner": "2.0.8"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

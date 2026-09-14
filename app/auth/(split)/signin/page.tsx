@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { AuroraLogo } from "@/components/auth/aurora-logo";
 import {
   AuthButton,
@@ -11,6 +12,7 @@ import {
   TextInput,
 } from "@/components/auth/form-controls";
 import { BffRequestError, loginRequest } from "@/lib/bff/client";
+import { sessionExpiredMessage } from "@/lib/session-expiry";
 
 function SignInForm() {
   const router = useRouter();
@@ -22,6 +24,17 @@ function SignInForm() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get("reason") !== "session_expired") return;
+    if (searchParams.get("notified") !== "1") {
+      toast.error(sessionExpiredMessage());
+    }
+    const url = new URL(window.location.href);
+    url.searchParams.delete("reason");
+    url.searchParams.delete("notified");
+    window.history.replaceState({}, "", url.pathname + url.search);
+  }, [searchParams]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

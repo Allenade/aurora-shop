@@ -107,6 +107,7 @@ export type BillingInvoice = {
   date: string;
   amount: string;
   status?: string;
+  trackingNumber?: string;
 };
 
 export const DEFAULT_PAYMENT_METHODS: PaymentMethod[] = [

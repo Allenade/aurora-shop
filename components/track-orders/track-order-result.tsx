@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
+import { CopyTrackingButton } from "@/components/ui/copy-tracking-button";
 import type { TrackedShipment, TrackStatus } from "@/lib/track-orders";
 import { cn } from "@/lib/utils";
 
@@ -34,11 +35,15 @@ export function TrackOrderResult({ shipment }: TrackOrderResultProps) {
           <h2 className="text-lg font-bold text-aurora-ink sm:text-xl">
             Order #{shipment.orderId}
           </h2>
-          <p className="mt-1 text-sm text-[#8a8a8a]">
+          <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-[#8a8a8a]">
             Tracking Number:{" "}
             <span className="font-medium text-aurora-ink">
               {shipment.trackingNumber}
             </span>
+            <CopyTrackingButton
+              trackingNumber={shipment.trackingNumber}
+              className="text-xs"
+            />
           </p>
         </div>
         <Badge tone={statusTone(shipment.status)}>{shipment.status}</Badge>
