@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useState } from "react";
 import { SearchInput } from "@/components/ui/search-input";
 import { UserMenu } from "@/components/layout/user-menu";
 import { useCartOptional } from "@/lib/cart-store";
@@ -42,18 +42,31 @@ type TopBarSearchProps = {
 };
 
 function TopBarSearch({ searchPath }: TopBarSearchProps) {
-  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const onSearchPage =
     pathname === searchPath || pathname.startsWith(`${searchPath}/`);
   const urlQuery = onSearchPage ? (searchParams.get("q")?.trim() ?? "") : "";
 
-  const [value, setValue] = useState(urlQuery);
+  // Remount when the URL query changes so the input stays in sync without an effect.
+  return (
+    <TopBarSearchField
+      key={`${searchPath}:${urlQuery}`}
+      searchPath={searchPath}
+      initialValue={urlQuery}
+    />
+  );
+}
 
-  useEffect(() => {
-    setValue(urlQuery);
-  }, [urlQuery]);
+function TopBarSearchField({
+  searchPath,
+  initialValue,
+}: {
+  searchPath: string;
+  initialValue: string;
+}) {
+  const router = useRouter();
+  const [value, setValue] = useState(initialValue);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

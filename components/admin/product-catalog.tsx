@@ -215,6 +215,24 @@ export function ProductCatalog({
 }) {
   const searchParams = useSearchParams();
   const urlQuery = searchParams.get('q')?.trim() ?? '';
+
+  // Remount when the URL query changes so local search state resets without an effect.
+  return (
+    <ProductCatalogContent
+      key={urlQuery}
+      urlQuery={urlQuery}
+      initialData={urlQuery ? undefined : initialData}
+    />
+  );
+}
+
+function ProductCatalogContent({
+  urlQuery,
+  initialData,
+}: {
+  urlQuery: string;
+  initialData?: AdminListInitialData<CatalogProduct>;
+}) {
   const [products, setProducts] = useState<CatalogProduct[]>(initialData?.items ?? []);
   const [query, setQuery] = useState(urlQuery);
   const [debouncedQuery, setDebouncedQuery] = useState(urlQuery);
@@ -238,15 +256,6 @@ export function ProductCatalog({
   const skipKeyRef = useRef(
     initialData && !urlQuery ? ADMIN_PRODUCTS_INITIAL_KEY : null,
   );
-
-  useEffect(() => {
-    setQuery(urlQuery);
-    setDebouncedQuery(urlQuery);
-    setPage(1);
-    if (urlQuery) {
-      skipKeyRef.current = null;
-    }
-  }, [urlQuery]);
 
   const fetchKey = `${debouncedQuery}\0${filter}\0${page}\0${reloadKey}`;
   const loading = fetchState.key !== fetchKey;
