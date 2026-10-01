@@ -113,8 +113,8 @@ function PaymentCardIcon() {
 }
 
 const PAYMENT_DETAILS: Record<PaymentMethodId, string> = {
-  bank: "Pay directly to our bank account. Order ships after confirmation.",
-  card: "Pay securely with your debit or credit card.",
+  bank: "Paystack Pay with Transfer. You'll be sent to Paystack to pay from your bank.",
+  card: "Pay securely with your debit or credit card on Paystack.",
 };
 
 type ReviewPaymentProps = {

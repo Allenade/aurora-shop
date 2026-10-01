@@ -157,7 +157,7 @@ export function AdminOverview() {
                       items: 1,
                       amount: recent.amount,
                       total: recent.amount,
-                      payment: "Bank Transfer",
+                      payment: "Pay with Transfer",
                       status: recent.status,
                       date: recent.date,
                     }),
@@ -177,6 +177,11 @@ export function AdminOverview() {
           order={selectedOrder}
           onClose={() => setSelectedOrder(null)}
           onStatusChange={handleStatusChange}
+          onPaymentStanding={(paymentStatus) => {
+            setSelectedOrder((current) =>
+              current ? { ...current, paymentStatus } : current,
+            );
+          }}
         />
       ) : null}
     </div>

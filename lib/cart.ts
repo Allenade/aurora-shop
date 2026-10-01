@@ -103,26 +103,9 @@ export const PAYMENT_METHODS: {
   id: PaymentMethodId;
   label: string;
 }[] = [
-  { id: "bank", label: "Bank Transfer" },
+  { id: "bank", label: "Pay with Transfer" },
   { id: "card", label: "Debit/Credit Card" },
 ];
-
-export const BANK_TRANSFER_DETAILS = {
-  bank: "Guaranty Trust Bank (GTB)",
-  accountName: "Aurora Stores Ltd",
-  accountNumber: "0123456789",
-} as const;
-
-export function createTransferReference() {
-  const digits = Math.floor(100000000 + Math.random() * 900000000);
-  return `RE - ${digits}`;
-}
-
-export function formatCartMoneyCompact(amount: number) {
-  return `₦${amount.toLocaleString("en-NG", {
-    maximumFractionDigits: 0,
-  })}`;
-}
 
 export function getCartTotals(
   lines: { price: number; qty: number }[],

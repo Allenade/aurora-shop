@@ -9,6 +9,7 @@ import type {
 } from "@/lib/admin";
 import { catalogStatusLabel } from "@/lib/domain/stock";
 import type { OrderRecord } from "@/lib/orders";
+import { displayPaymentMethod } from "@/lib/payments";
 import type { RecentQuote } from "@/lib/procurements";
 import type { ShopProduct } from "@/lib/shop";
 
@@ -99,7 +100,12 @@ export function toAdminOrder(
     items: order.itemCount,
     amount: order.total,
     total: order.total,
-    payment: order.paymentMethod === "Card" ? "Card" : "Bank Transfer",
+    payment:
+      displayPaymentMethod(order.paymentMethod) === "Card"
+        ? "Card"
+        : "Pay with Transfer",
+    paymentStatus: order.paymentStatus,
+    transactionReference: order.transactionReference,
     status,
     date: order.date,
   };

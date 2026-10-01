@@ -438,6 +438,13 @@ export function AdminOrders({
           order={selectedOrder}
           onClose={() => setSelectedId(null)}
           onStatusChange={handleStatusChange}
+          onPaymentStanding={(paymentStatus) => {
+            setOrders((prev) =>
+              prev.map((order) =>
+                order.id === selectedOrder.id ? { ...order, paymentStatus } : order,
+              ),
+            );
+          }}
         />
       ) : null}
     </div>
