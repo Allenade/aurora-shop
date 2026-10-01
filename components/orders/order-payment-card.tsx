@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { CopyTrackingButton } from "@/components/ui/copy-tracking-button";
 import type { OrderRecord } from "@/lib/orders";
+import { displayPaymentMethod } from "@/lib/payments";
 
 function paymentTone(status: OrderRecord["paymentStatus"]) {
   if (status === "Paid") return "green" as const;
@@ -17,7 +18,9 @@ export function OrderPaymentCard({ order }: { order: OrderRecord }) {
       <dl className="mt-5 space-y-3.5 text-sm">
         <div className="flex items-center justify-between gap-4">
           <dt className="text-[#6b7280]">Method</dt>
-          <dd className="font-medium text-aurora-ink">{order.paymentMethod}</dd>
+          <dd className="font-medium text-aurora-ink">
+            {displayPaymentMethod(order.paymentMethod)}
+          </dd>
         </div>
         <div className="flex items-center justify-between gap-4">
           <dt className="text-[#6b7280]">Status</dt>

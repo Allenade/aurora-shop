@@ -2,10 +2,18 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { toast } from 'sonner';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { buildAdminOrderTimeline, type AdminOrder, type AdminOrderStatus } from '@/lib/admin';
+import { BffRequestError } from '@/lib/bff/client';
+import { bffCall } from '@/lib/bff/generated/client';
+import {
+  adminReverifyMessage,
+  displayPaymentStanding,
+  type ShopPaymentStatus,
+} from '@/lib/payments';
 import { cn } from '@/lib/utils';
 
 const STATUS_OPTIONS: AdminOrderStatus[] = ['Pending', 'In Transit', 'Delivered'];
@@ -43,15 +51,56 @@ type AdminOrderDetailDrawerProps = {
   order: AdminOrder;
   onClose: () => void;
   onStatusChange: (status: AdminOrderStatus) => void;
+  onPaymentStanding?: (standing: 'Paid' | 'Unpaid' | 'Refunded') => void;
 };
 
 export function AdminOrderDetailDrawer({
   order,
   onClose,
   onStatusChange,
+  onPaymentStanding,
 }: AdminOrderDetailDrawerProps) {
   const [entered, setEntered] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [verifyOverride, setVerifyOverride] = useState<{
+    orderId: string;
+    standing: 'Paid' | 'Unpaid' | 'Refunded';
+    note: string;
+  } | null>(null);
   const timeline = useMemo(() => buildAdminOrderTimeline(order.status), [order.status]);
+  const verifyNote = verifyOverride?.orderId === order.id ? verifyOverride.note : null;
+  const paymentStanding =
+    verifyOverride?.orderId === order.id ? verifyOverride.standing : order.paymentStatus;
+
+  async function handleReverify() {
+    if (!order.transactionReference || verifying) return;
+    setVerifying(true);
+    try {
+      const status = await bffCall<ShopPaymentStatus>('confirmBankTransfer', {
+        params: { reference: order.transactionReference },
+      });
+      const message = adminReverifyMessage(status);
+      const standing = displayPaymentStanding(status);
+      setVerifyOverride({ orderId: order.id, standing, note: message });
+      onPaymentStanding?.(standing);
+      if (status.paid || status.status === 'success') toast.success(message);
+      else if (status.status === 'pending') toast.message(message);
+      else toast.error(message);
+    } catch (error) {
+      const message =
+        error instanceof BffRequestError
+          ? error.message
+          : 'Could not re-verify this payment with Paystack.';
+      setVerifyOverride({
+        orderId: order.id,
+        standing: order.paymentStatus ?? 'Unpaid',
+        note: message,
+      });
+      toast.error(message);
+    } finally {
+      setVerifying(false);
+    }
+  }
 
   useEffect(() => {
     const previous = document.body.style.overflow;
@@ -135,7 +184,13 @@ export function AdminOrderDetailDrawer({
                 value={`${order.items} item${order.items === 1 ? '' : 's'}`}
               />
               <SummaryRow label="Payment Method" value={order.payment} />
+              {paymentStanding ? (
+                <SummaryRow label="Payment Status" value={paymentStanding} />
+              ) : null}
               <SummaryRow label="Total" value={order.total} />
+              {verifyNote ? (
+                <p className="py-2.5 text-sm leading-relaxed text-[#5f5f5f]">{verifyNote}</p>
+              ) : null}
             </div>
           </div>
 
@@ -190,13 +245,26 @@ export function AdminOrderDetailDrawer({
           </div>
         </div>
 
-        <div className="flex flex-col gap-2.5 border-t border-[#ececec] bg-white px-5 py-4 sm:flex-row sm:px-6">
-          <Button variant="outline" className="flex-1" type="button">
-            Download Invoice
-          </Button>
-          <Button variant="lime" className="flex-1" type="button" onClick={onClose}>
-            Close
-          </Button>
+        <div className="flex flex-col gap-2.5 border-t border-[#ececec] bg-white px-5 py-4 sm:px-6">
+          {order.transactionReference ? (
+            <Button
+              variant="outline"
+              className="w-full"
+              type="button"
+              disabled={verifying}
+              onClick={() => void handleReverify()}
+            >
+              {verifying ? 'Re-verifying with Paystack…' : 'Re-verify with Paystack'}
+            </Button>
+          ) : null}
+          <div className="flex flex-col gap-2.5 sm:flex-row">
+            <Button variant="outline" className="flex-1" type="button">
+              Download Invoice
+            </Button>
+            <Button variant="lime" className="flex-1" type="button" onClick={onClose}>
+              Close
+            </Button>
+          </div>
         </div>
       </aside>
     </div>,

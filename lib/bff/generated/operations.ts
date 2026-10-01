@@ -30,8 +30,15 @@ export const operations = {
   getOrder: { method: "GET", path: "/orders/:id" },
   trackOrder: { method: "GET", path: "/track" },
   setOrderStatus: { method: "PATCH", path: "/admin/orders/:id/status" },
+  /** Paystack webhook only. `provider=bank` is gone (410). */
   handlePaymentCallback: { method: "POST", path: "/transactions/callback/:provider" },
+  /** Re-verifies a pending shop payment with Paystack, including transfers. */
   getTransactionStatus: { method: "GET", path: "/transactions/:reference/status" },
+  /**
+   * Swagger operationId is still `confirmBankTransfer`.
+   * It re-verifies the reference, amount, and currency with Paystack
+   * (`confirmationSource: admin`) and does not mark a transfer paid by itself.
+   */
   confirmBankTransfer: { method: "POST", path: "/transactions/:reference/confirm" },
   createQuote: { method: "POST", path: "/quotes" },
   updateQuote: { method: "PATCH", path: "/quotes/:id" },

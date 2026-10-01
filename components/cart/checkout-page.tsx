@@ -2,10 +2,8 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { BankTransferPayment } from "@/components/cart/bank-transfer-payment";
-import { CardPaymentForm } from "@/components/cart/card-payment-form";
 import { CheckoutSteps } from "@/components/cart/checkout-steps";
 import { DeliveryInformationForm } from "@/components/cart/delivery-information-form";
 import { OrderPlacedSuccess } from "@/components/cart/order-placed-success";
@@ -15,7 +13,6 @@ import { CheckoutSkeleton } from "@/components/ui/skeleton";
 import { LoadingSpinner } from "@/components/ui/spinner";
 import {
   DELIVERY_METHODS,
-  getCartTotals,
   INITIAL_DELIVERY_FORM,
   type DeliveryFormState,
   type DeliveryMethodId,
@@ -26,6 +23,12 @@ import { Action, Resource, RequirePermission } from "@/lib/permissions";
 import type { ShopProduct } from "@/lib/shop";
 import { bffCall } from "@/lib/bff/generated/client";
 import { readReorderNotices } from "@/lib/reorder";
+import {
+  displayPaymentMethod,
+  pollTransactionStatus,
+  type ShopPaymentStatus,
+} from "@/lib/payments";
+import type { OrderRecord } from "@/lib/orders";
 
 function PlaceOrderIcon() {
   return (
@@ -70,16 +73,7 @@ type CartLine = {
   qty: number;
 };
 
-type CheckoutPhase = "delivery" | "review" | "bank" | "card" | "success";
-
-type PaymentStatusResponse = {
-  reference: string;
-  provider: "paystack" | "bank";
-  status: "pending" | "success" | "failed" | "refunded" | "cancelled";
-  paid: boolean;
-  orderNumber?: string;
-  trackingNumber?: string;
-};
+type CheckoutPhase = "delivery" | "review" | "pending" | "success";
 
 const PAYMENT_POLL_ATTEMPTS = 8;
 const PAYMENT_POLL_DELAY_MS = 2000;
@@ -112,24 +106,19 @@ function CheckoutPageContent() {
     Partial<Record<keyof DeliveryFormState, string>>
   >({});
   const [shippingLoading, setShippingLoading] = useState(true);
-  const [authorizationUrl, setAuthorizationUrl] = useState<string | null>(null);
   const [deliveryId, setDeliveryId] = useState<DeliveryMethodId>("standard");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethodId>("bank");
+  const [paymentLabel, setPaymentLabel] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [trackingNumber, setTrackingNumber] = useState<string | null>(null);
-  const [transferReference, setTransferReference] = useState<string | null>(
-    null,
-  );
-  const [bankDetails, setBankDetails] = useState<{
-    bank: string;
-    accountName: string;
-    accountNumber: string;
-  } | null>(null);
+  const [pendingReference, setPendingReference] = useState<string | null>(null);
   const [clearingCart, setClearingCart] = useState(false);
   const [placingOrder, setPlacingOrder] = useState(false);
+  const [checkingPayment, setCheckingPayment] = useState(false);
   const [confirmingPayment, setConfirmingPayment] = useState(
     () => paymentReturnReference(searchParams) !== null,
   );
+  const settledRef = useRef(false);
 
   useEffect(() => {
     // sessionStorage is client-only; defer so we don't sync-set in the effect body
@@ -176,10 +165,6 @@ function CheckoutPageContent() {
 
   const delivery =
     DELIVERY_METHODS.find((m) => m.id === deliveryId) ?? DELIVERY_METHODS[0]!;
-  const { total } = getCartTotals(
-    lines.map((line) => ({ price: line.product.price, qty: line.qty })),
-    delivery.price,
-  );
   const step = phase === "delivery" ? 1 : 2;
 
   function updateForm<K extends keyof DeliveryFormState>(
@@ -203,48 +188,34 @@ function CheckoutPageContent() {
 
     let cancelled = false;
 
-    // Paystack confirms out-of-band, so poll our own backend until it verifies.
+    // Paystack confirms out-of-band for both card and Pay with Transfer.
     void (async () => {
-      for (let attempt = 0; attempt < PAYMENT_POLL_ATTEMPTS; attempt += 1) {
-        if (cancelled) return;
-        try {
-          const status = await bffCall<PaymentStatusResponse>(
-            "getTransactionStatus",
-            { params: { reference: payRef } },
-          );
-          if (cancelled) return;
-          if (status.paid) {
-            setConfirmingPayment(false);
-            setPaymentMethod(status.provider === "bank" ? "bank" : "card");
-            completeOrder(
-              status.orderNumber ?? payRef,
-              status.trackingNumber ?? undefined,
-            );
-            return;
-          }
-          if (status.status === "failed" || status.status === "cancelled") {
-            setConfirmingPayment(false);
-            toast.error("Payment was not completed. You can try again.");
-            return;
-          }
-        } catch {
-          // Keep polling — the webhook may still be in flight.
-        }
-        await new Promise((resolve) =>
-          window.setTimeout(resolve, PAYMENT_POLL_DELAY_MS),
-        );
-      }
+      const outcome = await pollTransactionStatus(payRef, {
+        attempts: PAYMENT_POLL_ATTEMPTS,
+        delayMs: PAYMENT_POLL_DELAY_MS,
+        isCancelled: () => cancelled,
+      });
       if (cancelled) return;
+      if (outcome.kind === "paid") {
+        await finishPaid(outcome.status);
+        return;
+      }
+      if (outcome.kind === "failed") {
+        setConfirmingPayment(false);
+        setPendingReference(null);
+        toast.error(failureMessage(outcome.status));
+        return;
+      }
       setConfirmingPayment(false);
-      toast.message(
-        "We haven't received confirmation yet. Check your orders in a moment.",
-      );
+      setPendingReference(payRef);
+      setPhase("pending");
     })();
 
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per pay callback
+    // Poll once per Paystack return. finishPaid reads the latest checkout state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   async function placeOrderOnServer() {
@@ -253,8 +224,8 @@ function CheckoutPageContent() {
       trackingNumber: string;
       payment?: {
         reference?: string;
-        authorizationUrl?: string;
-        bank?: { bank: string; accountName: string; accountNumber: string };
+        authorizationUrl?: string | null;
+        bank?: null;
       };
     }>("createCheckout", {
       body: {
@@ -279,9 +250,6 @@ function CheckoutPageContent() {
     });
     setOrderId(result.id);
     setTrackingNumber(result.trackingNumber);
-    setTransferReference(result.payment?.reference ?? result.id);
-    setAuthorizationUrl(result.payment?.authorizationUrl ?? null);
-    setBankDetails(result.payment?.bank ?? null);
     return result;
   }
 
@@ -307,6 +275,66 @@ function CheckoutPageContent() {
     clearPurchasedItems();
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
+
+  async function finishPaid(status: ShopPaymentStatus) {
+    if (settledRef.current) return;
+    settledRef.current = true;
+    const orderNumber = status.orderNumber ?? status.reference;
+    let label = displayPaymentMethod(paymentMethod);
+    try {
+      const order = await bffCall<OrderRecord>("getOrder", {
+        params: { id: orderNumber },
+      });
+      const method = order.paymentMethod.toLowerCase().includes("card")
+        ? "card"
+        : "bank";
+      setPaymentMethod(method);
+      label = displayPaymentMethod(order.paymentMethod);
+    } catch {
+      // Status already says the charge succeeded; label falls back to the selection.
+    }
+    setPaymentLabel(label);
+    setConfirmingPayment(false);
+    setPendingReference(null);
+    completeOrder(orderNumber, status.trackingNumber);
+  }
+
+  function failureMessage(status: ShopPaymentStatus) {
+    if (status.status === "refunded") {
+      return "This payment was refunded. You can start checkout again.";
+    }
+    if (status.status === "cancelled") {
+      return "Payment was cancelled. You can try again.";
+    }
+    return "Payment was not completed. You can try again.";
+  }
+
+  useEffect(() => {
+    if (phase !== "pending" || !pendingReference) return;
+    let cancelled = false;
+    // Transfers often stay pending after the buyer returns from Paystack.
+    void (async () => {
+      const outcome = await pollTransactionStatus(pendingReference, {
+        attempts: 24,
+        delayMs: 5000,
+        isCancelled: () => cancelled,
+      });
+      if (cancelled || settledRef.current) return;
+      if (outcome.kind === "paid") {
+        await finishPaid(outcome.status);
+        return;
+      }
+      if (outcome.kind === "failed") {
+        setPendingReference(null);
+        setPhase("review");
+        toast.error(failureMessage(outcome.status));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keep polling while pending
+  }, [phase, pendingReference]);
 
   function handleContinue() {
     if (lines.length === 0) return;
@@ -334,9 +362,15 @@ function CheckoutPageContent() {
       void (async () => {
         setPlacingOrder(true);
         try {
-          await placeOrderOnServer();
-          setPhase(paymentMethod === "bank" ? "bank" : "card");
-          window.scrollTo({ top: 0, behavior: "smooth" });
+          const result = await placeOrderOnServer();
+          const authorizationUrl = result.payment?.authorizationUrl?.trim();
+          if (!authorizationUrl) {
+            toast.error(
+              "Paystack did not return a checkout link. Please try again.",
+            );
+            return;
+          }
+          window.location.assign(authorizationUrl);
         } catch (error) {
           toast.error(
             error instanceof Error ? error.message : "Unable to place order",
@@ -348,26 +382,29 @@ function CheckoutPageContent() {
     }
   }
 
-  function handleTransferCompleted() {
-    if (!orderId || !trackingNumber) return;
-    completeOrder(orderId, trackingNumber);
-  }
-
-  function handleCardPlaceOrder() {
-    if (authorizationUrl) {
-      window.location.href = authorizationUrl;
-      return;
-    }
-    if (!orderId || !trackingNumber) return;
-    completeOrder(orderId, trackingNumber);
-  }
-
-  function handleChooseAnotherMethod() {
-    setPhase("review");
-    setTransferReference(null);
-    setOrderId(null);
-    setAuthorizationUrl(null);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+  function handleCheckPaymentAgain() {
+    if (!pendingReference || checkingPayment) return;
+    setCheckingPayment(true);
+    void (async () => {
+      const outcome = await pollTransactionStatus(pendingReference, {
+        attempts: 1,
+        delayMs: 0,
+        isCancelled: () => false,
+      });
+      if (outcome.kind === "paid") {
+        await finishPaid(outcome.status);
+        return;
+      }
+      if (outcome.kind === "failed") {
+        setPendingReference(null);
+        setPhase("review");
+        toast.error(failureMessage(outcome.status));
+        return;
+      }
+      toast.message(
+        "Still pending with Paystack. Bank transfers can take a few minutes after you send them.",
+      );
+    })().finally(() => setCheckingPayment(false));
   }
 
   async function handleClearCart() {
@@ -411,8 +448,53 @@ function CheckoutPageContent() {
         form={form}
         delivery={delivery}
         paymentMethod={paymentMethod}
+        paymentLabel={paymentLabel ?? undefined}
         lines={lines}
       />
+    );
+  }
+
+  if (phase === "pending" && pendingReference) {
+    return (
+      <div className="mx-auto flex w-full max-w-xl flex-col items-center py-16 text-center">
+        <h1 className="text-[1.5rem] font-bold tracking-tight text-aurora-ink">
+          Payment pending
+        </h1>
+        <p className="mt-2 max-w-md text-sm leading-relaxed text-[#8a8a8a]">
+          Paystack has not confirmed this payment yet. Card charges usually
+          finish quickly. Pay with Transfer can stay pending for a few minutes
+          after you send the money.
+        </p>
+        <p className="mt-4 text-xs text-[#8a8a8a]">
+          Reference{" "}
+          <span className="font-semibold text-aurora-ink">
+            {pendingReference}
+          </span>
+        </p>
+        <div className="mt-6 flex w-full flex-col gap-2.5">
+          <button
+            type="button"
+            onClick={handleCheckPaymentAgain}
+            disabled={checkingPayment}
+            className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-aurora-lime text-sm font-semibold text-aurora-ink transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-70"
+          >
+            {checkingPayment ? (
+              <>
+                <LoadingSpinner />
+                Checking Paystack…
+              </>
+            ) : (
+              "Check payment status"
+            )}
+          </button>
+          <Link
+            href="/orders"
+            className="inline-flex h-12 w-full items-center justify-center rounded-lg border border-[#e5e5e5] bg-white text-sm font-semibold text-aurora-ink transition-colors hover:border-[#d0d0d0]"
+          >
+            View orders
+          </Link>
+        </div>
+      </div>
     );
   }
 
@@ -486,21 +568,6 @@ function CheckoutPageContent() {
             />
           ) : null}
 
-          {phase === "bank" && transferReference ? (
-            <BankTransferPayment
-              amount={total}
-              transferReference={transferReference}
-              payerName={form.fullName}
-              bank={bankDetails}
-            />
-          ) : null}
-
-          {phase === "card" ? (
-            <CardPaymentForm
-              authorizationUrl={authorizationUrl}
-              onPay={handleCardPlaceOrder}
-            />
-          ) : null}
         </div>
 
         <div className="flex w-full min-w-0 flex-col gap-3 lg:sticky lg:top-6 lg:h-fit">
@@ -538,12 +605,12 @@ function CheckoutPageContent() {
                 {placingOrder ? (
                   <>
                     <LoadingSpinner />
-                    <span>Placing order…</span>
+                    <span>Opening Paystack…</span>
                   </>
                 ) : (
                   <>
                     <PlaceOrderIcon />
-                    Place Order
+                    Continue to Paystack
                   </>
                 )}
               </button>
@@ -553,51 +620,6 @@ function CheckoutPageContent() {
             </>
           ) : null}
 
-          {phase === "bank" ? (
-            <>
-              <button
-                type="button"
-                onClick={handleTransferCompleted}
-                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-aurora-lime text-sm font-semibold text-aurora-ink transition-opacity hover:opacity-90"
-              >
-                <PlaceOrderIcon />
-                I&apos;ve Completed the Transfer
-              </button>
-              <button
-                type="button"
-                onClick={handleChooseAnotherMethod}
-                className="inline-flex h-12 w-full items-center justify-center rounded-lg border border-[#e5e5e5] bg-white text-sm font-semibold text-aurora-ink transition-colors hover:border-[#d0d0d0]"
-              >
-                Choose Another Method
-              </button>
-              <p className="text-center text-xs text-[#8a8a8a]">
-                By placing your order, you agree to our Terms & Conditions.
-              </p>
-            </>
-          ) : null}
-
-          {phase === "card" ? (
-            <>
-              <button
-                type="button"
-                onClick={handleCardPlaceOrder}
-                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-aurora-lime text-sm font-semibold text-aurora-ink transition-opacity hover:opacity-90"
-              >
-                <PlaceOrderIcon />
-                Place Order
-              </button>
-              <button
-                type="button"
-                onClick={handleChooseAnotherMethod}
-                className="inline-flex h-12 w-full items-center justify-center rounded-lg border border-[#e5e5e5] bg-white text-sm font-semibold text-aurora-ink transition-colors hover:border-[#d0d0d0]"
-              >
-                Choose Another Method
-              </button>
-              <p className="text-center text-xs text-[#8a8a8a]">
-                By placing your order, you agree to our Terms & Conditions.
-              </p>
-            </>
-          ) : null}
         </div>
       </div>
     </div>
