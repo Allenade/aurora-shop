@@ -26,6 +26,7 @@ type OrderPlacedSuccessProps = {
   form: DeliveryFormState;
   delivery: DeliveryMethod;
   paymentMethod: PaymentMethodId;
+  paymentLabel?: string;
   lines: OrderLine[];
 };
 
@@ -35,10 +36,13 @@ export function OrderPlacedSuccess({
   form,
   delivery,
   paymentMethod,
+  paymentLabel,
   lines,
 }: OrderPlacedSuccessProps) {
-  const paymentLabel =
-    PAYMENT_METHODS.find((m) => m.id === paymentMethod)?.label ?? "Payment";
+  const resolvedPaymentLabel =
+    paymentLabel ??
+    PAYMENT_METHODS.find((m) => m.id === paymentMethod)?.label ??
+    "Paystack";
   const addressLine = [form.streetAddress, form.city, form.state, "Nigeria"]
     .filter(Boolean)
     .join(", ");
@@ -148,7 +152,7 @@ export function OrderPlacedSuccess({
               Payment
             </p>
             <p className="mt-1 text-sm font-bold text-aurora-ink">
-              {paymentLabel}
+              {resolvedPaymentLabel}
             </p>
             <p className="mt-0.5 text-sm text-[#5f5f5f]">
               {delivery.label} — {delivery.description}

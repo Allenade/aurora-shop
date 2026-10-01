@@ -45,6 +45,8 @@ export type OrderRecord = {
   taxLabel: string;
   paymentMethod: string;
   paymentStatus: "Paid" | "Unpaid" | "Refunded";
+  /** Paystack reference used by admin re-verify and status polling. */
+  transactionReference?: string;
   trackingNumber: string;
   shippingName: string;
   shippingAddress: string;

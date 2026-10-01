@@ -507,7 +507,7 @@ export type AdminOrderStatus =
   | "Pending"
   | "Cancelled";
 
-export type AdminOrderPayment = "Bank Transfer" | "Card";
+export type AdminOrderPayment = "Pay with Transfer" | "Card";
 
 export type AdminOrder = {
   id: string;
@@ -519,6 +519,8 @@ export type AdminOrder = {
   amount: string;
   total: string;
   payment: AdminOrderPayment;
+  paymentStatus?: "Paid" | "Unpaid" | "Refunded";
+  transactionReference?: string;
   status: AdminOrderStatus;
   date: string;
 };
@@ -580,7 +582,7 @@ export const ADMIN_ORDERS: AdminOrder[] = [
     items: 8,
     amount: "₦235,000",
     total: "₦235,000.00",
-    payment: "Bank Transfer",
+    payment: "Pay with Transfer",
     status: "Delivered",
     date: "Apr 11, 2026",
   },
@@ -604,7 +606,7 @@ export const ADMIN_ORDERS: AdminOrder[] = [
     items: 5,
     amount: "₦156,000",
     total: "₦156,000.00",
-    payment: "Bank Transfer",
+    payment: "Pay with Transfer",
     status: "Pending",
     date: "Apr 10, 2026",
   },
@@ -628,7 +630,7 @@ export const ADMIN_ORDERS: AdminOrder[] = [
     items: 3,
     amount: "₦78,000",
     total: "₦78,000.00",
-    payment: "Bank Transfer",
+    payment: "Pay with Transfer",
     status: "Pending",
     date: "Apr 09, 2026",
   },
@@ -652,7 +654,7 @@ export const ADMIN_ORDERS: AdminOrder[] = [
     items: 7,
     amount: "₦298,000",
     total: "₦298,000.00",
-    payment: "Bank Transfer",
+    payment: "Pay with Transfer",
     status: "Delivered",
     date: "Apr 08, 2026",
   },
@@ -676,7 +678,7 @@ export const ADMIN_ORDERS: AdminOrder[] = [
     items: 9,
     amount: "₦367,000",
     total: "₦367,000.00",
-    payment: "Bank Transfer",
+    payment: "Pay with Transfer",
     status: "In Transit",
     date: "Apr 07, 2026",
   },
